@@ -204,6 +204,16 @@ textarea.fi.small-ta{min-height:150px}
 .pdf-stage .slip th{background:#E8EDEC}
 .pdf-stage .slip td.amt,.pdf-stage .slip .total b{color:#2A47A6}
 .pdf-stage .slip td.rm,.pdf-stage .slip .sign span{color:#5B686E}
+#printArea{display:none}
+@media print{
+  body.printing > *:not(#printArea){display:none!important}
+  body.printing{background:#fff}
+  body.printing #printArea{display:block;--bg:#fff;--surface:#fff;--sunk:#E8EDEC;--ink:#17222A;--muted:#5B686E;--line:#D3DCDB;--accent:#2A47A6;color:#17222A}
+  body.printing .print-page{break-after:page;page-break-after:always}
+  body.printing .print-page:last-child{break-after:auto;page-break-after:auto}
+  body.printing .slip{max-width:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:A4 portrait;margin:12mm}
+}
 @media (prefers-reduced-motion:no-preference){.who,.btn{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -1239,9 +1249,26 @@ function exportAll() {
 /* PDF：把線上薪資單以淺色版面轉成 A4 */
 const loaded = {};
 const loadScript = src => loaded[src] || (loaded[src] = new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => { delete loaded[src]; no(new Error('load')); }; document.head.appendChild(s); }));
+/* 依序嘗試多個來源，任一個載入成功即可 */
+async function loadAny(urls, ready) {
+  for (const u of urls) { if (ready()) return; try { await loadScript(u); if (ready()) return; } catch (e) { console.warn('載入失敗', u); } }
+  if (!ready()) throw new Error('load');
+}
 async function pdfLibs() {
-  await Promise.all([loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'), loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js')]);
+  await Promise.all([
+    loadAny(['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js'], () => typeof window.html2canvas === 'function'),
+    loadAny(['https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'], () => !!(window.jspdf && window.jspdf.jsPDF))
+  ]);
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
+}
+/* 備用：元件載不到時，用瀏覽器列印另存 PDF（只印薪資單） */
+function printSlips(list) {
+  const area = document.createElement('div'); area.id = 'printArea';
+  area.innerHTML = list.map(e => `<div class="print-page">${slip(e, calc(e, st.month))}</div>`).join('');
+  document.body.appendChild(area); document.body.classList.add('printing');
+  const done = () => { document.body.classList.remove('printing'); area.remove(); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => { window.print(); setTimeout(done, 1000); }, 50);
 }
 async function slipCanvas(emp, r) {
   const stage = document.createElement('div'); stage.className = 'pdf-stage';
@@ -1259,7 +1286,7 @@ async function exportPdf(all) {
   const list = all ? empList().filter(e => getRec(e.id, st.month)) : [st.emps[st.sel]];
   if (!list.length || !list[0]) { toast('本月沒有可匯出的薪資單'); return; }
   toast('正在產生 PDF…');
-  try { await pdfLibs(); } catch (e) { toast('PDF 元件載入失敗，請確認網路後再試'); return; }
+  try { await pdfLibs(); } catch (e) { toast('改用列印視窗：目的地選「另存為 PDF」'); printSlips(list); return; }
   const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   for (let i = 0; i < list.length; i++) addSlipPage(pdf, await slipCanvas(list[i], calc(list[i], st.month)), i === 0);
   pdf.save(all ? `${ymTag()}薪資單-全員.pdf` : `${ymTag()}薪資-${list[0].name}.pdf`);
