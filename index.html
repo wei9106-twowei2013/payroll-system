@@ -276,7 +276,7 @@ const PAYCALC = (() => {
     pensionEr: 6, otCap: 46,
     fieldWords: '佈展,卸展,施工,監工,出差',
     mealWords: '佈展,卸展,施工',
-    quickEarn: ['全勤獎金', '工作獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '停車費'],
+    quickEarn: ['全勤獎金', '專案獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '停車費'],
     quickDed: ['預支', '代扣款', '其他'],
     holidays: [
       ['2026-01-01', '開國紀念日'], ['2026-02-16', '除夕'], ['2026-02-17', '春節'], ['2026-02-18', '春節'],
@@ -638,7 +638,7 @@ function enterApp(user) {
     if (st.ready && changed) render(); done();
   }, handleErr));
   unsubs.push(onSnapshot(doc(fdb, COLL.config, 'main'), s => {
-    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
+    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (Array.isArray(v.quickEarn)) v.quickEarn = v.quickEarn.map(x => x === '工作獎金' ? '專案獎金' : x); if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
     done();
   }, handleErr));
   resetIdle();
