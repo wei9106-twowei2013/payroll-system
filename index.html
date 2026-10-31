@@ -187,7 +187,7 @@ textarea.fi.small-ta{min-height:150px}
 .seg{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px}
 .seg label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .sched{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
-.sv-h,.sv-row{display:grid;grid-template-columns:150px repeat(5,78px) 110px 28px;gap:6px;align-items:center;min-width:760px}
+.sv-h,.sv-row{display:grid;grid-template-columns:130px repeat(5,78px) 110px 28px;gap:6px;align-items:center;min-width:760px}
 .sv-h{font-size:11.5px;color:var(--muted)}
 .sv-row{padding:6px;border:1px solid var(--line);border-radius:var(--r)}
 .sv-row.cur{border-color:var(--accent)}
@@ -868,7 +868,9 @@ function schedEditor(list, scope) {
     <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span><span>下班</span><span>加班起算</span><span>每日正常工時</span><span></span></div>
     ${sorted.map(({ v, i }) => {
       const si = P.schedInfo(v);
-      const inp = (k, w) => `<input class="fi num ${w || ''}" type="${k === 'from' ? 'date' : 'text'}" value="${esc(v[k])}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="${k}" aria-label="${k}">`;
+      const inp = (k, w) => k === 'from'
+        ? `<input class="fi num" type="text" inputmode="numeric" value="${v.from <= '2000-01-01' ? '' : esc(v.from.replace(/-/g, '/'))}" placeholder="${v.from <= '2000-01-01' ? '最早（不限）' : '2026/12/01'}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="from" aria-label="生效日，例如 2026/12/01 或 115/12/1">`
+        : `<input class="fi num ${w || ''}" type="text" inputmode="numeric" value="${esc(v[k])}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="${k}" aria-label="${k}">`;
       const isCur = scope === 'emp' ? JSON.stringify(cur) === JSON.stringify(v) && st.emps[st.sel].schedMode === 'custom' : JSON.stringify(P.schedFor(null, todayStr(), st.settings)) === JSON.stringify(v);
       return `<div class="sv-row ${isCur ? 'cur' : ''}">
         ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${inp('end')}${inp('ot')}
@@ -879,6 +881,16 @@ function schedEditor(list, scope) {
     }).join('')}
     <button type="button" class="btn small" data-act="addsv" data-scope="${scope}">＋新增班表（設定新的生效日）</button>
   </div>`;
+}
+/* 生效日：接受 2026/12/1、2026-12-01、20261201、民國 115/12/1；空白＝最早 */
+function parseDate(v) {
+  v = String(v || '').trim(); if (!v) return '2000-01-01';
+  let m = /^(\d{2,4})[\/\-.年\s]+(\d{1,2})[\/\-.月\s]+(\d{1,2})日?$/.exec(v) || /^(\d{4})(\d{2})(\d{2})$/.exec(v);
+  if (!m) return null;
+  let y = +m[1], mo = +m[2], d = +m[3]; if (y < 1911) y += 1911;
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 const todayStr = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
 
@@ -997,7 +1009,7 @@ document.addEventListener('click', e => {
       const t = new Date(); const nx = new Date(t.getFullYear(), t.getMonth() + 1, 1);
       let from = `${nx.getFullYear()}-${String(nx.getMonth() + 1).padStart(2, '0')}-01`; if (last.from && last.from >= from) { const [y, m] = last.from.split('-').map(Number); const d = new Date(y, m, 1); from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
       list.push({ ...last, from });
-      toast(`已新增 ${from} 起的班表，請修改時間`);
+      toast(`已新增 ${from.replace(/-/g, "/")} 起的班表，請修改時間`);
     } else list.splice(+b.dataset.i, 1);
     save(isCo ? 'config/main' : 'employees/' + emp.id); render();
   }
@@ -1053,7 +1065,7 @@ document.addEventListener('change', e => {
   } else if (f === 'sv') {
     const isCo = el.dataset.scope === 'co'; const emp = st.emps[st.sel];
     const list = isCo ? st.settings.schedules : emp.scheds; const v = list[+el.dataset.i]; const k = el.dataset.k;
-    if (k === 'from') { if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) { toast('請選擇生效日'); render(); return; } v.from = val; }
+    if (k === 'from') { const d = parseDate(val); if (!d) { toast('生效日請填 2026/12/01 或民國 115/12/1'); render(); return; } v.from = d; }
     else { const t = normTime(val); if (!t) { toast('時間格式請用 08:00'); render(); return; } v[k] = t; if (k === 'end' && P.toMin(v.ot) < P.toMin(t)) v.ot = t; }
     const si = P.schedInfo(v); if (!(si.s < si.ls && si.ls <= si.le && si.le < si.e)) toast('時間順序應為：上班 < 午休開始 ≤ 午休結束 < 下班');
     save(isCo ? 'config/main' : 'employees/' + emp.id);
