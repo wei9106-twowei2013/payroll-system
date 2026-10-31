@@ -196,6 +196,14 @@ textarea.fi.small-ta{min-height:150px}
 .sv-warn{grid-column:1/-1;margin:2px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
 .sv-warn li{font-size:12.5px;color:var(--bad);background:var(--bad-soft);border-radius:4px;padding:4px 8px}
 .sched > .btn{align-self:flex-start;margin-top:4px}
+/* PDF 匯出：固定淺色、固定寬度，畫在畫面外 */
+.pdf-stage{position:fixed;left:-12000px;top:0;width:880px;padding:0;background:#fff;
+  --bg:#FFFFFF;--surface:#FFFFFF;--sunk:#E8EDEC;--ink:#17222A;--muted:#5B686E;--line:#D3DCDB;--accent:#2A47A6;color:#17222A;color-scheme:light}
+.pdf-stage .slip{max-width:none;background:#fff}
+.pdf-stage .slip th,.pdf-stage .slip td,.pdf-stage .slip div,.pdf-stage .slip span{color:#17222A}
+.pdf-stage .slip th{background:#E8EDEC}
+.pdf-stage .slip td.amt,.pdf-stage .slip .total b{color:#2A47A6}
+.pdf-stage .slip td.rm,.pdf-stage .slip .sign span{color:#5B686E}
 @media (prefers-reduced-motion:no-preference){.who,.btn{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -236,7 +244,7 @@ textarea.fi.small-ta{min-height:150px}
 <input type="file" id="file" accept=".xlsx,.xls,.csv" multiple hidden>
 <div id="toast" class="toast" hidden></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 /* 圖威薪資計算核心：純函式，頁面與測試共用 */
 const PAYCALC = (() => {
@@ -767,7 +775,7 @@ function viewPay() {
     <div class="helper"><span>雇主負擔（不從薪資扣）：</span><span class="employer">勞保 <b>${money(r.employer.labor)}</b> 健保 <b>${money(r.employer.health)}</b> 勞退 ${S.pensionEr}% <b>${money(r.employer.pension)}</b> 合計 <b>${money(r.employer.labor + r.employer.health + r.employer.pension)}</b></span></div>
   </section>
   <section class="panel">
-    <div class="ph"><h2>薪資單</h2><div class="acts"><button type="button" class="btn small" data-act="xone">匯出這張薪資單</button></div></div>
+    <div class="ph"><h2>薪資單</h2><div class="acts"><button type="button" class="btn small" data-act="xone">匯出 Excel</button><button type="button" class="btn small" data-act="xonepdf">匯出 PDF</button></div></div>
     <div class="slip-wrap"><div class="slip-inner">${slip(emp, r)}</div></div>
   </section>
   </div></div>`;
@@ -805,7 +813,7 @@ function dayTable(emp, rec, r) {
 
 function slip(emp, r) {
   const [y, m] = st.month.split('-').map(Number);
-  const E = r.earnings.filter(x => x.amount || !x.extra), D = r.deductions.filter(x => x.amount || !x.extra);
+  const { E, D } = slipRows(r);
   const n = Math.max(E.length, D.length);
   const S = st.settings; let rows = '';
   for (let i = 0; i < n; i++) {
@@ -854,7 +862,7 @@ function viewSum() {
     if (has) { T.g += r.gross; T.ot += r.otPay; T.meal += r.mealAmt; T.d += r.ded; T.n += r.net; T.er += er; }
     return `<tr><td><button type="button" class="btn ghost small" style="color:var(--ink);padding-left:0" data-act="open" data-id="${e.id}">${esc(e.name)}</button></td><td class="num">${has ? P.dur(r.capMin) : '—'}</td><td class="num">${has ? money(r.otPay) : '—'}</td><td class="num">${has ? money(r.mealAmt) : '—'}</td><td class="num">${has ? money(r.gross) : '—'}</td><td class="num">${has ? money(r.ded) : '—'}</td><td class="num net">${has ? money(r.net) : '—'}</td><td class="num">${has ? money(er) : '—'}</td><td>${has && r.flags.length ? `<span class="chip holiday">${r.flags.length} 項提醒</span>` : ''}${has && r.overrides ? ` <span class="chip rest">${r.overrides} 項手動調整</span>` : ''}</td></tr>`;
   }).join('');
-  return `<section class="panel"><div class="ph"><h2>${roc(st.month)}薪資總表</h2><div class="acts"><button type="button" class="btn primary small" data-act="xall">匯出全員 Excel</button></div></div>
+  return `<section class="panel"><div class="ph"><h2>${roc(st.month)}薪資總表</h2><div class="acts"><button type="button" class="btn primary small" data-act="xall">匯出全員 Excel</button><button type="button" class="btn small" data-act="xallpdf">匯出全員 PDF</button></div></div>
   <div class="tscroll"><table class="sum"><thead><tr><th>姓名</th><th>延長工時</th><th>加班費</th><th>餐費</th><th>應支</th><th>應扣</th><th>實發</th><th>雇主負擔</th><th></th></tr></thead><tbody>${rows}
   <tr class="tot"><td>合計</td><td></td><td class="num">${money(T.ot)}</td><td class="num">${money(T.meal)}</td><td class="num">${money(T.g)}</td><td class="num">${money(T.d)}</td><td class="num net">${money(T.n)}</td><td class="num">${money(T.er)}</td><td></td></tr></tbody></table></div>
   <p class="hint" style="margin-top:10px">雇主負擔＝勞保 ${st.settings.laborEr}%、健保 ${st.settings.healthEr}%（含平均眷口 ${st.settings.healthAvgDep}）、勞退 ${st.settings.pensionEr}%；職業災害保險費依公司費率另計。</p></section>`;
@@ -1025,6 +1033,8 @@ document.addEventListener('click', e => {
   else if (a === 'bkout') exportBackup();
   else if (a === 'bkin') $('#bkfile').click();
   else if (a === 'xall') exportAll();
+  else if (a === 'xonepdf') exportPdf(false);
+  else if (a === 'xallpdf') exportPdf(true);
 });
 
 document.addEventListener('input', e => {
@@ -1125,34 +1135,135 @@ async function importFiles(files) {
 }
 
 /* ---------- 匯出 ---------- */
-function slipAoa(emp, r) {
-  const [y, m] = st.month.split('-').map(Number); const S = st.settings; const t = new Date();
-  const aoa = [['', '', '', `${y - 1911}/${String(m).padStart(2, '0')}/薪資`, '', ''], [`職稱：${emp.title || ''}`, '', '', '', `姓名：${emp.name}`, ''], ['應支薪資', '', 'REMARK', '應扣金額', '', 'REMARK']];
-  const n = Math.max(r.earnings.length, r.deductions.length);
-  for (let i = 0; i < n; i++) { const a = r.earnings[i] || {}, b = r.deductions[i] || {}; aoa.push([a.label || '', a.amount || null, a.remark || '', b.label || '', b.amount || null, b.remark || '']); }
-  aoa.push(['合計', r.gross, '', '合計', r.ded, ''], ['總合計算', '', '應支薪資－應扣金額＝', '', r.net, ''], [`主管：${S.manager}　　會計：${S.accountant}　　製表：${t.getFullYear() - 1911}.${t.getMonth() + 1}月`]);
-  const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 34 }, { wch: 12 }, { wch: 10 }, { wch: 30 }]; return ws;
+const BLUE = '2A47A6', INK = '17222A', MUTED = '5B686E', GRID = 'D3DCDB', HEAD = 'E8EDEC';
+const XFONT = '微軟正黑體';
+const slipRows = r => ({ E: r.earnings.filter(x => x.amount || !x.extra), D: r.deductions.filter(x => x.amount || !x.extra) });
+const ymTag = () => { const [y, m] = st.month.split('-').map(Number); return `${y - 1911}${String(m).padStart(2, '0')}`; };
+const makeTag = () => { const t = new Date(); return `${t.getFullYear() - 1911}.${t.getMonth() + 1} 月`; };
+
+/* 薪資單（與線上相同版面）：A 應支 B 金額 C REMARK｜D 應扣 E 金額 F REMARK */
+function slipSheet(emp, r) {
+  const [y, m] = st.month.split('-').map(Number); const S = st.settings;
+  const { E, D } = slipRows(r); const n = Math.max(E.length, D.length);
+  const ws = {}; const merges = [];
+  const line = (style, color) => ({ style, color: { rgb: color } });
+  const thin = line('thin', GRID), black = line('thin', INK), bold = line('medium', INK);
+  const put = (row, col, v, s = {}) => {
+    const ref = XLSX.utils.encode_cell({ r: row, c: col });
+    const cell = { v: v ?? '', t: typeof v === 'number' ? 'n' : 's' };
+    cell.s = { font: { name: XFONT, sz: 10.5, color: { rgb: INK }, ...(s.font || {}) }, alignment: { horizontal: 'left', vertical: 'center', wrapText: true, indent: 1, ...(s.alignment || {}) }, border: Object.fromEntries(Object.entries(s.border || {}).filter(([, v]) => v)) };
+    if (s.fill) cell.s.fill = { patternType: 'solid', fgColor: { rgb: s.fill } };
+    if (typeof v === 'number') cell.s.numFmt = '#,##0';
+    ws[ref] = cell;
+  };
+  // 外框：左 A、右 F；中間 C|D 一條直線
+  const bd = (c, top, bottom) => {
+    const b = { top: top || thin, bottom: bottom || thin };
+    if (c === 0) b.left = bold; if (c === 5) b.right = bold; if (c === 2) b.right = black; if (c === 3) b.left = black;
+    return b;
+  };
+  let R = 0;
+  // 標題列
+  put(R, 0, `職稱：${emp.title || ''}`, { border: { top: bold, left: bold, bottom: black } }); put(R, 1, '', { border: { top: bold, bottom: black } });
+  put(R, 2, `${y - 1911}/${String(m).padStart(2, '0')}/薪資`, { font: { sz: 16 }, alignment: { horizontal: 'center' }, border: { top: bold, bottom: black } }); put(R, 3, '', { border: { top: bold, bottom: black } });
+  put(R, 4, `姓名：${emp.name}`, { alignment: { horizontal: 'right' }, border: { top: bold, right: bold, bottom: black } }); put(R, 5, '', { border: { top: bold, right: bold, bottom: black } });
+  merges.push({ s: { r: R, c: 0 }, e: { r: R, c: 1 } }, { s: { r: R, c: 2 }, e: { r: R, c: 3 } }, { s: { r: R, c: 4 }, e: { r: R, c: 5 } });
+  R++;
+  // 表頭
+  ['應支薪資', '金額', 'REMARK', '應扣金額', '金額', 'REMARK'].forEach((h, c) => put(R, c, h, { fill: HEAD, font: { sz: 10, bold: true }, alignment: { horizontal: c === 1 || c === 4 ? 'right' : 'left' }, border: bd(c, black) }));
+  R++;
+  // 項目
+  for (let i = 0; i < n; i++) {
+    const a = E[i], b = D[i];
+    put(R, 0, a ? a.label : '', { border: bd(0) });
+    put(R, 1, a && a.amount ? a.amount : '', { font: { color: { rgb: BLUE } }, alignment: { horizontal: 'right' }, border: bd(1) });
+    put(R, 2, a ? a.remark : '', { font: { sz: 9, color: { rgb: MUTED } }, border: bd(2) });
+    put(R, 3, b ? b.label : '', { border: bd(3) });
+    put(R, 4, b && b.amount ? b.amount : '', { font: { color: { rgb: BLUE } }, alignment: { horizontal: 'right' }, border: bd(4) });
+    put(R, 5, b ? b.remark : '', { font: { sz: 9, color: { rgb: MUTED } }, border: bd(5) });
+    R++;
+  }
+  // 合計
+  [['合計'], [r.gross], [''], ['合計'], [r.ded], ['']].forEach(([v], c) => put(R, c, v, { font: { bold: true, color: { rgb: c === 1 || c === 4 ? BLUE : INK } }, alignment: { horizontal: c === 1 || c === 4 ? 'right' : 'left' }, border: bd(c, black, black) }));
+  R++;
+  // 實發
+  for (let c = 0; c < 6; c++) put(R, c, '', { border: { left: c === 0 ? bold : undefined, right: c === 5 ? bold : undefined, bottom: thin } });
+  put(R, 0, '應支薪資－應扣金額＝', { alignment: { horizontal: 'right' }, border: { left: bold, bottom: thin } });
+  put(R, 4, r.net, { font: { sz: 18, bold: true, color: { rgb: BLUE } }, alignment: { horizontal: 'right' }, border: { right: bold, bottom: thin } }); put(R, 5, '', { border: { right: bold, bottom: thin } });
+  merges.push({ s: { r: R, c: 0 }, e: { r: R, c: 3 } }, { s: { r: R, c: 4 }, e: { r: R, c: 5 } });
+  const netRow = R; R++;
+  // 簽核
+  const sg = { font: { sz: 9.5, color: { rgb: MUTED } } };
+  put(R, 0, `主管：${S.manager}`, { ...sg, border: { left: bold, bottom: bold } }); put(R, 1, '', { border: { bottom: bold } });
+  put(R, 2, `會計：${S.accountant}`, { ...sg, alignment: { horizontal: 'center' }, border: { bottom: bold } }); put(R, 3, '', { border: { bottom: bold } });
+  put(R, 4, `製表：${makeTag()}`, { ...sg, alignment: { horizontal: 'right' }, border: { right: bold, bottom: bold } }); put(R, 5, '', { border: { right: bold, bottom: bold } });
+  merges.push({ s: { r: R, c: 0 }, e: { r: R, c: 1 } }, { s: { r: R, c: 2 }, e: { r: R, c: 3 } }, { s: { r: R, c: 4 }, e: { r: R, c: 5 } });
+
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: R, c: 5 } });
+  ws['!merges'] = merges;
+  ws['!cols'] = [{ wch: 13 }, { wch: 10 }, { wch: 25 }, { wch: 12 }, { wch: 9 }, { wch: 19 }];
+  const rows = [{ hpt: 34 }, { hpt: 22 }];
+  for (let i = 0; i < n; i++) { const a = E[i], b = D[i]; const len = Math.max((a?.remark || '').length / 13, (b?.remark || '').length / 10, 1); rows.push({ hpt: Math.max(24, Math.ceil(len) * 14 + 8) }); }
+  rows.push({ hpt: 24 }); rows[netRow] = { hpt: 40 }; rows.push({ hpt: 24 });
+  ws['!rows'] = rows;
+  ws['!margins'] = { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 };
+  return ws;
 }
-function daysAoa(emp, r) {
+function daysSheet(emp, r) {
   const rec = getRec(emp.id, st.month) || { days: {} };
   const aoa = [[`${emp.name} ${roc(st.month)} 出勤明細`], ['日期', '星期', '類型', '上班', '下班', '加班開始', '加班結束', '休息(分)', '假別', '請假時數', '備註', '加班/出勤時數', '加班費', '遲到(分)', '提醒']];
   r.rows.forEach(x => { const d = rec.days[x.d] || {}; aoa.push([x.d, WK[P.dow(x.d)], x.type === 'holiday' ? x.hol : P.TYPE_NAME[x.type], d.in || '', d.out || '', d.os || '', d.oe || '', d.rest || '', d.leave || '', d.leave ? (d.leaveH ?? 8) : '', d.note || '', x.ot ? P.hrs(x.ot) : '', x.pay ? Math.round(x.pay) : '', x.late || '', x.warn.join('；')]); });
-  aoa.push([], ['平日每小時工資', +r.R.toFixed(2), '加班費合計', r.otPay, '延長工時(時)', P.hrs(r.capMin)]);
-  const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [{ wch: 11 }, { wch: 5 }, { wch: 10 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: 9 }, { wch: 8 }, { wch: 40 }]; return ws;
+  aoa.push([], ['平日每小時工資', +r.R.toFixed(2), '加班費（系統）', r.otAuto, '延長工時(時)', P.hrs(r.capMin)]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  Object.keys(ws).forEach(k => { if (k[0] === '!') return; const { r: row } = XLSX.utils.decode_cell(k); ws[k].s = { font: { name: XFONT, sz: 10, bold: row <= 1 }, alignment: { vertical: 'center' }, ...(row === 1 ? { fill: { patternType: 'solid', fgColor: { rgb: HEAD } } } : {}) }; });
+  ws['!cols'] = [{ wch: 11 }, { wch: 5 }, { wch: 10 }, { wch: 7 }, { wch: 7 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 22 }, { wch: 12 }, { wch: 9 }, { wch: 8 }, { wch: 40 }];
+  return ws;
 }
-function saveWb(wb, filename) { XLSX.writeFile(wb, filename); }
+function saveWb(wb, filename) { XLSX.writeFile(wb, filename, { cellStyles: true }); }
 function exportOne() {
   const emp = st.emps[st.sel]; const r = calc(emp, st.month); const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, slipAoa(emp, r), '薪資單'); XLSX.utils.book_append_sheet(wb, daysAoa(emp, r), '出勤明細');
-  const [y, m] = st.month.split('-').map(Number); saveWb(wb, `${y - 1911}${String(m).padStart(2, '0')}薪資-${emp.name}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, slipSheet(emp, r), '薪資單'); XLSX.utils.book_append_sheet(wb, daysSheet(emp, r), '出勤明細');
+  saveWb(wb, `${ymTag()}薪資-${emp.name}.xlsx`);
 }
 function exportAll() {
   const wb = XLSX.utils.book_new(); const list = empList().filter(e => getRec(e.id, st.month));
   const sum = [[`${roc(st.month)} 薪資總表`], ['姓名', '職稱', '延長工時(時)', '加班費', '餐費', '應支', '應扣', '實發', '雇主勞保', '雇主健保', '雇主勞退']];
   list.forEach(e => { const r = calc(e, st.month); sum.push([e.name, e.title || '', P.hrs(r.capMin), r.otPay, r.mealAmt, r.gross, r.ded, r.net, r.employer.labor, r.employer.health, r.employer.pension]); });
-  const ws = XLSX.utils.aoa_to_sheet(sum); ws['!cols'] = [{ wch: 10 }, { wch: 16 }, ...Array(9).fill({ wch: 11 })]; XLSX.utils.book_append_sheet(wb, ws, '總表');
-  list.forEach(e => { const r = calc(e, st.month); XLSX.utils.book_append_sheet(wb, slipAoa(e, r), `${e.name}薪資單`.slice(0, 31)); XLSX.utils.book_append_sheet(wb, daysAoa(e, r), `${e.name}出勤`.slice(0, 31)); });
-  const [y, m] = st.month.split('-').map(Number); saveWb(wb, `${y - 1911}${String(m).padStart(2, '0')}薪資總表.xlsx`);
+  const ws = XLSX.utils.aoa_to_sheet(sum);
+  Object.keys(ws).forEach(k => { if (k[0] === '!') return; const { r: row, c } = XLSX.utils.decode_cell(k); ws[k].s = { font: { name: XFONT, sz: row === 0 ? 14 : 10.5, bold: row <= 1, color: { rgb: c === 7 && row > 1 ? BLUE : INK } }, numFmt: '#,##0', ...(row === 1 ? { fill: { patternType: 'solid', fgColor: { rgb: HEAD } } } : {}) }; });
+  ws['!cols'] = [{ wch: 10 }, { wch: 16 }, ...Array(9).fill({ wch: 11 })]; XLSX.utils.book_append_sheet(wb, ws, '總表');
+  list.forEach(e => { const r = calc(e, st.month); XLSX.utils.book_append_sheet(wb, slipSheet(e, r), `${e.name}薪資單`.slice(0, 31)); XLSX.utils.book_append_sheet(wb, daysSheet(e, r), `${e.name}出勤`.slice(0, 31)); });
+  saveWb(wb, `${ymTag()}薪資總表.xlsx`);
+}
+
+/* PDF：把線上薪資單以淺色版面轉成 A4 */
+const loaded = {};
+const loadScript = src => loaded[src] || (loaded[src] = new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => { delete loaded[src]; no(new Error('load')); }; document.head.appendChild(s); }));
+async function pdfLibs() {
+  await Promise.all([loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'), loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js')]);
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+}
+async function slipCanvas(emp, r) {
+  const stage = document.createElement('div'); stage.className = 'pdf-stage';
+  stage.innerHTML = slip(emp, r); document.body.appendChild(stage);
+  try { return await html2canvas(stage, { scale: 2, backgroundColor: '#ffffff', logging: false }); }
+  finally { stage.remove(); }
+}
+function addSlipPage(pdf, canvas, first) {
+  if (!first) pdf.addPage();
+  const W = 210, H = 297, M = 12; let w = W - M * 2, h = canvas.height * w / canvas.width;
+  if (h > H - M * 2) { h = H - M * 2; w = canvas.width * h / canvas.height; }
+  pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', (W - w) / 2, M, w, h);
+}
+async function exportPdf(all) {
+  const list = all ? empList().filter(e => getRec(e.id, st.month)) : [st.emps[st.sel]];
+  if (!list.length || !list[0]) { toast('本月沒有可匯出的薪資單'); return; }
+  toast('正在產生 PDF…');
+  try { await pdfLibs(); } catch (e) { toast('PDF 元件載入失敗，請確認網路後再試'); return; }
+  const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  for (let i = 0; i < list.length; i++) addSlipPage(pdf, await slipCanvas(list[i], calc(list[i], st.month)), i === 0);
+  pdf.save(all ? `${ymTag()}薪資單-全員.pdf` : `${ymTag()}薪資-${list[0].name}.pdf`);
+  toast('PDF 已下載');
 }
 
 render();
