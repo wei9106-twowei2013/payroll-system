@@ -319,13 +319,19 @@ const PAYCALC = (() => {
       emp.scheds = [{ from: '2000-01-01', start, ls: '12:00', le: fmtMin(720 + brk), end, ot: end }];
     }
     emp.schedMode = emp.schedMode || 'company';
+    // 固定項目一律有「專業加給」，接在底薪（或月薪）後面
+    emp.items = Array.isArray(emp.items) ? emp.items : [];
+    if (!emp.items.some(i => i.label === '專業加給')) {
+      const at = emp.items.findIndex(i => i.label === '底薪' || i.label === '月薪');
+      emp.items.splice(at >= 0 ? at + 1 : 0, 0, { label: '專業加給', amount: 0, base: true, kind: 'fixed' });
+    }
     return emp;
   }
 
   const newEmployee = (name, id) => ({
     id: id || ('e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
     name: name || '新員工', title: '', order: 99, active: true,
-    items: [{ label: '底薪', amount: 30000, base: true, kind: 'fixed' }, { label: '全勤獎金', amount: 0, base: true, kind: 'attendance' }],
+    items: [{ label: '底薪', amount: 30000, base: true, kind: 'fixed' }, { label: '專業加給', amount: 0, base: true, kind: 'fixed' }, { label: '全勤獎金', amount: 0, base: true, kind: 'attendance' }],
     labor: 29500, health: 29500, pension: 29500, deps: 0, selfPension: 0, sickYtdH: 0, meal: true,
     schedMode: 'company', scheds: [{ from: '2000-01-01', start: '08:00', ls: '12:00', le: '13:00', end: '17:00', ot: '17:00' }]
   });
@@ -1088,7 +1094,7 @@ async function importFiles(files) {
       let emp = empList().find(x => x.name === parsed.name);
       if (!emp) {
         emp = P.newEmployee(parsed.name); emp.order = empList().length + 1;
-        if (parsed.salary) emp.items = [{ label: '底薪', amount: parsed.salary, base: true, kind: 'fixed' }];
+        if (parsed.salary) { emp.items[0].amount = parsed.salary; emp.items = emp.items.filter(i => i.kind !== 'attendance'); }
         const wage = parsed.salary || 30000; emp.labor = P.bracket(P.LABOR_TABLE, wage); emp.health = emp.pension = P.bracket(P.HEALTH_TABLE, wage);
         const co = P.schedFor(null, parsed.month + '-01', st.settings);
         if (parsed.typicalIn && parsed.typicalOut && (parsed.typicalIn !== co.start || parsed.typicalOut !== co.end)) {
