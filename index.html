@@ -7,15 +7,15 @@
 <meta name="referrer" content="no-referrer">
 <title>圖威薪資計算</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
 /* 版面：左側員工名冊＋右側工作區；薪資單仿紙本薪資條，數字用複寫紙藍 */
 :root{
   --bg:#F1F4F3; --surface:#FFFFFF; --sunk:#E8EDEC; --ink:#17222A; --muted:#5B686E; --line:#D3DCDB;
   --accent:#2A47A6; --accent-soft:#E5EAF8; --warn:#9A6312; --warn-soft:#FAEFD9; --bad:#B0281F; --bad-soft:#F8E1DE; --good:#2C7A4C; --good-soft:#E1F1E7;
-  --f-display:"Noto Serif TC","Songti TC","PMingLiU",serif;
-  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
-  --f-num:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --f-body:"Noto Sans TC","PingFang TC","Heiti TC","Microsoft JhengHei","微軟正黑體",sans-serif;
+  --f-display:var(--f-body);
+  --f-num:var(--f-body);
   --r:6px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -39,6 +39,7 @@ body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55}
 button,input,select,textarea{font:inherit;color:inherit}
 .num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+body,button,input,select,textarea,table{font-family:var(--f-body)}
 .wrap{max-width:1360px;margin:0 auto;padding-inline:16px;padding-block:14px 48px}
 header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:6px 14px;border-bottom:1px solid var(--line);margin-bottom:16px}
 .brand{display:flex;align-items:baseline;gap:10px}
@@ -157,12 +158,44 @@ table.sum td.net{color:var(--accent)}
 .rule p,.rule ul{margin:0;color:var(--muted);font-size:13px}
 .rule ul{padding-left:18px}
 .rule .law{font-family:var(--f-num);font-size:11.5px;color:var(--accent);letter-spacing:.04em}
-textarea.fi{min-height:220px;font-family:var(--f-num);font-size:12.5px}
+textarea.fi{min-height:220px;font-size:13px}
+textarea.fi.small-ta{min-height:150px}
 .empty{padding:40px 20px;text-align:center;color:var(--muted)}
 .empty h2{font-family:var(--f-display);color:var(--ink);font-size:20px;margin:0 0 6px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:20;max-width:calc(100% - 32px)}
 .drop{border:1.5px dashed var(--line);border-radius:8px;padding:14px;text-align:center;color:var(--muted);font-size:13px}
 .drop.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+/* 本月加扣項 */
+.adj{min-width:0}
+.adj-h{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:6px}
+.adj-h h3{margin:0;font-size:14px;color:var(--ink);font-weight:700}
+.adj-h b{font-size:16px;color:var(--accent);font-weight:500}
+.adj-cols,.adj .xrow{display:grid;grid-template-columns:minmax(0,1.15fr) 72px 92px minmax(0,1.4fr) 28px;gap:6px;align-items:center}
+.adj-cols{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+.adj .xrow{margin-bottom:5px}
+.adj .lbl{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.adj .lbl em{font-style:normal;font-size:11px;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:0 6px;margin-left:6px;font-weight:400}
+.adj .auto{color:var(--muted);text-align:right;font-size:13px}
+.adj .xrow.ovr input[data-k="amount"]{border-color:var(--warn);background:var(--warn-soft)}
+.adj .xrow.ext{padding-top:5px;border-top:1px dashed var(--line)}
+.adj .xrow.ext + .xrow.ext{border-top:0;padding-top:0}
+.cb2{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.btn.dashed{border-style:dashed;color:var(--muted)}
+@media (max-width:560px){.adj-cols{display:none}.adj .xrow{grid-template-columns:1fr 1fr}.adj .xrow .lbl{grid-column:1/-1}}
+/* 班表 */
+.seg{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+.seg label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.sched{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
+.sv-h,.sv-row{display:grid;grid-template-columns:150px repeat(5,78px) 110px 28px;gap:6px;align-items:center;min-width:760px}
+.sv-h{font-size:11.5px;color:var(--muted)}
+.sv-row{padding:6px;border:1px solid var(--line);border-radius:var(--r)}
+.sv-row.cur{border-color:var(--accent)}
+.sv-row em{font-style:normal;font-size:11px;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:0 6px}
+.sv-row .badtxt{color:var(--bad);font-weight:700}
+.sv-warn{grid-column:1/-1;margin:2px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px}
+.sv-warn li{font-size:12.5px;color:var(--bad);background:var(--bad-soft);border-radius:4px;padding:4px 8px}
+.sched > .btn{align-self:flex-start;margin-top:4px}
 @media (prefers-reduced-motion:no-preference){.who,.btn{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -217,6 +250,7 @@ const PAYCALC = (() => {
   const fmtMin = m => { if (m == null) return ''; m = ((m % 1440) + 1440) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); };
   const dur = m => { m = Math.round(m || 0); return Math.floor(m / 60) + ':' + pad(m % 60); };
   const hrs = m => Math.round((m || 0) / 60 * 100) / 100;
+  const overlap = (a, b, c, d) => Math.max(0, Math.min(b, d) - Math.max(a, c));
 
   const LABOR_TABLE = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800];
   const HEALTH_TABLE = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800, 48200, 50600, 53000, 55400, 57800, 60800, 63800, 66800, 69800, 72800, 76500, 80200, 83900, 87600, 92100, 96600, 101100, 105600, 110100, 115500, 120900, 126300, 131700, 137100, 142500, 147900, 150000, 156400, 162800, 169200, 175600, 182000, 189500, 197000, 204500, 212000, 219500, 228200, 236900, 245600, 254300, 263000, 273000, 283000, 293000, 303000, 313000];
@@ -231,6 +265,9 @@ const PAYCALC = (() => {
 
   const DEFAULT_SETTINGS = {
     company: '圖威', manager: '周俊偉', accountant: '呂惠萍',
+    schedules: [
+      { from: '2000-01-01', start: '08:00', ls: '12:00', le: '13:30', end: '17:30', ot: '17:30' }
+    ],
     wd1: 1.34, wd2: 1.67, rd1: 1.34, rd2: 1.67, rd3: 2.67,
     unit: 1, grace: 0, lateMode: 'fixed', latePerMin: 1,
     mealPerDay: 60, mealInBase: false,
@@ -239,6 +276,8 @@ const PAYCALC = (() => {
     pensionEr: 6, otCap: 46,
     fieldWords: '佈展,卸展,施工,監工,出差',
     mealWords: '佈展,卸展,施工',
+    quickEarn: ['全勤獎金', '工作獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '停車費'],
+    quickDed: ['預支', '代扣款', '其他'],
     holidays: [
       ['2026-01-01', '開國紀念日'], ['2026-02-16', '除夕'], ['2026-02-17', '春節'], ['2026-02-18', '春節'],
       ['2026-02-19', '春節'], ['2026-02-20', '小年夜補假'], ['2026-02-27', '和平紀念日補假'],
@@ -248,12 +287,47 @@ const PAYCALC = (() => {
     ]
   };
 
+  /* 班表 */
+  const schedInfo = v => {
+    const s = toMin(v.start), ls = toMin(v.ls), le = toMin(v.le), e = toMin(v.end), ot = toMin(v.ot);
+    const am = Math.max(0, ls - s), pm = Math.max(0, e - le);
+    const normal = am + pm, lunch = Math.max(0, le - ls);
+    const warn = [];
+    if (normal > 480) warn.push(`正常工時 ${dur(normal)}，超過每日 8 小時（§30），超出的 ${normal - 480} 分鐘每天自動按平日加班計`);
+    if (am > 240 || pm > 240) warn.push(`${am > 240 ? '上午' : '下午'}連續工作 ${dur(Math.max(am, pm))}，超過 4 小時須至少休息 30 分鐘（§35）`);
+    if (ot > e) warn.push(`${v.end} 下班到 ${v.ot} 加班起算之間須讓員工實際休息，期間若在工作仍應計加班`);
+    if (ot < e) warn.push('加班起算時間早於下班時間');
+    if (lunch < 30 && am + pm > 240) warn.push('午休少於 30 分鐘（§35）');
+    return { s, ls, le, e, ot, normal, am, pm, lunch, warn };
+  };
+  const schedList = (emp, S) => (emp && emp.schedMode === 'custom' && emp.scheds && emp.scheds.length) ? emp.scheds : (S.schedules || DEFAULT_SETTINGS.schedules);
+  const schedFor = (emp, date, S) => {
+    const list = [...schedList(emp, S)].sort((a, b) => a.from.localeCompare(b.from));
+    let v = list[0]; for (const x of list) if (x.from <= date) v = x;
+    return v;
+  };
+  const schedLabel = v => `${v.start}–${v.ls}、${v.le}–${v.end}`;
+
+  /* 舊資料（start/end/brk/ot）轉成班表版本 */
+  function migrateEmp(emp) {
+    if (!emp) return emp;
+    if (!emp.scheds) {
+      const o = emp.sched || {};
+      const start = o.start || '08:00', end = o.end || '17:30', brk = +o.brk || 90;
+      const same = start === '08:00' && end === '17:30';
+      emp.schedMode = same ? 'company' : 'custom';
+      emp.scheds = [{ from: '2000-01-01', start, ls: '12:00', le: fmtMin(720 + brk), end, ot: end }];
+    }
+    emp.schedMode = emp.schedMode || 'company';
+    return emp;
+  }
+
   const newEmployee = (name, id) => ({
     id: id || ('e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
     name: name || '新員工', title: '', order: 99, active: true,
     items: [{ label: '底薪', amount: 30000, base: true, kind: 'fixed' }, { label: '全勤獎金', amount: 0, base: true, kind: 'attendance' }],
     labor: 29500, health: 29500, pension: 29500, deps: 0, selfPension: 0, sickYtdH: 0, meal: true,
-    sched: { start: '08:00', end: '17:30', brk: 90, ot: '18:00' }
+    schedMode: 'company', scheds: [{ from: '2000-01-01', start: '08:00', ls: '12:00', le: '13:00', end: '17:00', ot: '17:00' }]
   });
 
   const daysOfMonth = month => { const [y, m] = month.split('-').map(Number); const n = new Date(y, m, 0).getDate(); return Array.from({ length: n }, (_, i) => `${month}-${pad(i + 1)}`); };
@@ -263,75 +337,75 @@ const PAYCALC = (() => {
   const tiers = (m, bands) => { let left = m, mult = 0; for (const [len, r] of bands) { const t = Math.min(left, len); mult += t * r; left -= t; if (left <= 0) break; } return mult / 60; };
   const floorU = (m, u) => Math.max(0, Math.floor(m / (u || 1)) * (u || 1));
 
-  function span(day, emp) {
+  function span(day, si) {
     let s = toMin(day.os), e = toMin(day.oe), rest = +day.rest || 0, fromPunch = false;
     if (s == null || e == null) { s = toMin(day.in); e = toMin(day.out); fromPunch = true; }
     if (s == null || e == null) return 0;
     if (e <= s) e += 1440;
-    if (fromPunch && !day.rest && e - s >= 360) rest = +emp.sched.brk || 0;
+    if (fromPunch && !day.rest) rest = overlap(s, e, si.ls, si.le);
     return Math.max(0, e - s - rest);
   }
 
-  function computeMonth(emp, month, rec, S) {
+  function computeMonth(emp0, month, rec, S) {
     S = Object.assign({}, DEFAULT_SETTINGS, S || {});
+    const emp = migrateEmp(JSON.parse(JSON.stringify(emp0 || {})));
     const holMap = {}; (S.holidays || []).forEach(([d, n]) => { holMap[d] = n || '國定假日'; });
     const days = (rec && rec.days) || {};
-    const sch = emp.sched || {}, start = toMin(sch.start), end = toMin(sch.end), thr = toMin(sch.ot) ?? end;
-    const fixedItems = (emp.items || []).filter(i => i.kind !== 'attendance');
-    const attItems = (emp.items || []).filter(i => i.kind === 'attendance');
+    const ovr = (rec && rec.ovr) || {};
     const rows = []; const flags = [];
-    let workdays = 0, mealDays = 0, lateMin = 0, unpaidH = 0, halfH = 0, attH = 0, sickH = 0, compMin = 0, capMin = 0;
+    let workdays = 0, mealDays = 0, lateMin = 0, unpaidH = 0, halfH = 0, attH = 0, sickH = 0, compMin = 0, capMin = 0, excessMin = 0;
     const otMin = { work: 0, rest: 0, regular: 0, holiday: 0 };
-    const leaveList = {};
+    const leaveList = {}; const usedScheds = new Map();
 
-    // 先算出每日分鐘數，加班費金額待時薪算出後再乘
     for (const d of daysOfMonth(month)) {
       const day = days[d] || {}; const type = dayType(d, holMap);
-      const r = { d, type, hol: holMap[d] || '', day, ot: 0, late: 0, mult: 0, dayPay: false, warn: [] };
+      const v = schedFor(emp, d, S); const si = schedInfo(v);
+      const r = { d, type, hol: holMap[d] || '', day, ot: 0, excess: 0, late: 0, mult: 0, dayPay: false, warn: [], sched: v };
       const lv = day.leave && LEAVES[day.leave] ? day.leave : '';
       const lvH = lv ? (+day.leaveH || 8) : 0;
       if (lv) { (leaveList[lv] = leaveList[lv] || []).push(+d.slice(5, 7) + '/' + +d.slice(8) + (lvH !== 8 ? `(${lvH}h)` : '')); }
       if (type === 'work') {
         workdays++;
+        usedScheds.set(JSON.stringify(v), v);
         if (lv) { const L = LEAVES[lv]; if (L.pay === 0) unpaidH += lvH; else if (L.pay === 0.5) halfH += lvH; if (L.att === true) attH += lvH; if (L.att === 'sick') sickH += lvH; }
         const tin = toMin(day.in), tout = toMin(day.out);
-        if (tin != null && !day.field) {
-          let l = Math.max(0, tin - (start + (+S.grace || 0)));
-          if (lv && lvH < 8) l = 0; // 半天假不計遲到
-          r.late += l;
-        }
-        if (tout != null && !day.field && !lv && toMin(day.os) == null && tout < end) r.late += end - tout;
+        if (tin != null && !day.field && !(lv && lvH < 8)) r.late += Math.max(0, tin - (si.s + (+S.grace || 0)));
+        if (tout != null && !day.field && !lv && toMin(day.os) == null && tout < si.e) r.late += si.e - tout;
         lateMin += r.late;
         if (tin == null && !lv && !day.field) r.warn.push('無打卡紀錄，請填假別');
         if ((tin != null || day.field) && lvH < 8 && emp.meal !== false && !day.meal) mealDays++;
+        // 正常工時超過 8 小時的部分（§30）
+        let worked = 0;
+        if (tin != null && tout != null) { const a = Math.max(tin, si.s), b = Math.min(tout >= tin ? tout : tout + 1440, si.e); worked = overlap(a, b, si.s, si.ls) + overlap(a, b, si.le, si.e); }
+        else if (day.field && !lv) worked = si.normal;
+        r.excess = Math.max(0, worked - 480);
+        // 下班後加班
+        let evening = 0;
         let s = toMin(day.os), e = toMin(day.oe);
-        if (s == null && e == null && tout != null && tout > thr) { s = tout; e = tout; s = thr; }
-        if (s == null && e != null) s = thr;
-        if (s != null && e != null) {
-          if (e < s) e += 1440;
-          const from = Math.max(s, thr);
-          r.ot = floorU(e - from - (+day.rest || 0), S.unit);
-        }
+        if (s == null && e == null && tout != null && tout > si.ot) { s = si.ot; e = tout; }
+        if (s == null && e != null) s = si.ot;
+        if (s != null && e != null) { if (e < s) e += 1440; evening = Math.max(0, e - Math.max(s, si.ot) - (+day.rest || 0)); }
+        r.ot = floorU(r.excess + evening, S.unit);
         if (r.ot > 0) {
-          capMin += r.ot;
+          capMin += r.ot; excessMin += r.excess;
           if (480 + r.ot > 720) r.warn.push('單日工時逾 12 小時（§32）');
           if (day.comp) { compMin += r.ot; r.mult = 0; }
           else { r.mult = tiers(r.ot, [[120, S.wd1], [Infinity, S.wd2]]); otMin.work += r.ot; }
         }
       } else {
-        const m = floorU(span(day, emp), S.unit);
+        const m = floorU(span(day, si), S.unit);
         r.ot = m;
         if (m > 0) {
           if (type === 'rest') {
             capMin += m;
-            if (m > 720) r.warn.push('休息日工作逾 12 小時');
+            if (m > 720) r.warn.push('休息日工作逾 12 小時（§32）');
             if (day.comp) { compMin += m; } else { r.mult = tiers(m, [[120, S.rd1], [360, S.rd2], [Infinity, S.rd3]]); otMin.rest += m; }
           } else {
             r.dayPay = true;
             const over = Math.max(0, m - 480); capMin += over;
             r.mult = tiers(over, [[120, S.wd1], [Infinity, S.wd2]]);
             otMin[type] += m;
-            if (m > 720) r.warn.push('單日工時逾 12 小時');
+            if (m > 720) r.warn.push('單日工時逾 12 小時（§32）');
             if (type === 'regular') r.warn.push('例假出勤限天災、事變或突發事件（§40），須事後補假 1 日');
           }
         }
@@ -343,49 +417,56 @@ const PAYCALC = (() => {
     const sickFree = Math.max(0, 80 - (+emp.sickYtdH || 0));
     const attLossH = attH + Math.max(0, sickH - sickFree);
     const totalH = Math.max(1, workdays * 8);
-    const attEarn = attItems.map(i => { const lost = Math.round(i.amount * Math.min(1, attLossH / totalH)); return { ...i, earned: i.amount - lost, lost }; });
+    const O = (key, auto) => (ovr[key] && ovr[key].amount != null && ovr[key].amount !== '') ? +ovr[key].amount : auto;
+    const R_ = (key, auto) => (ovr[key] && ovr[key].remark != null && ovr[key].remark !== '') ? ovr[key].remark : auto;
 
-    const mealAmt = emp.meal === false ? 0 : mealDays * (+S.mealPerDay || 0);
-    let base = fixedItems.filter(i => i.base).reduce((a, i) => a + (+i.amount || 0), 0) + attEarn.filter(i => i.base).reduce((a, i) => a + i.earned, 0);
+    // 應支：固定項目（可覆寫）
+    const earnings = [];
+    (emp.items || []).forEach(i => {
+      const key = 'i:' + i.label;
+      let auto = +i.amount || 0, remark = '';
+      if (i.kind === 'attendance') { const lost = Math.round(auto * Math.min(1, attLossH / totalH)); auto -= lost; if (lost) remark = `請假按比例扣 ${lost} 元`; }
+      earnings.push({ key, label: i.label, auto, amount: O(key, auto), autoRemark: remark, remark: R_(key, remark), base: !!i.base, kind: i.kind || 'fixed', overridden: O(key, auto) !== auto });
+    });
+    const extras = ((rec && rec.extras) || []).map((x, idx) => ({ key: 'x' + idx, idx, label: x.label, amount: +x.amount || 0, remark: x.remark || '', base: !!x.base, extra: true }));
+
+    const mealAuto = emp.meal === false ? 0 : mealDays * (+S.mealPerDay || 0);
+    const mealAmt = O('meal', mealAuto);
+    let base = earnings.filter(x => x.base).reduce((a, x) => a + x.amount, 0) + extras.filter(x => x.base).reduce((a, x) => a + x.amount, 0);
     if (S.mealInBase) base += mealAmt;
     const R = base / 240, dayWage = base / 30;
-    let otPay = 0;
-    rows.forEach(r => { r.pay = r.mult * R + (r.dayPay ? dayWage : 0); otPay += r.pay; });
-    otPay = Math.round(otPay);
+    let otAuto = 0;
+    rows.forEach(r => { r.pay = r.mult * R + (r.dayPay ? dayWage : 0); otAuto += r.pay; });
+    otAuto = Math.round(otAuto);
+    const otPay = O('ot', otAuto);
 
-    const latePropCap = lateMin * R / 60;
-    const lateAmt = Math.round(S.lateMode === 'prop' ? latePropCap : Math.min(lateMin * (+S.latePerMin || 0), latePropCap));
-    const unpaidAmt = Math.round(unpaidH * R), halfAmt = Math.round(halfH * R * 0.5);
-
-    if (capMin > (+S.otCap || 46) * 60) flags.push(`本月延長工時 ${dur(capMin)}，超過每月 ${S.otCap} 小時上限（§32）`);
-    rows.forEach(r => r.warn.forEach(w => flags.push(`${+r.d.slice(5, 7)}/${+r.d.slice(8)} ${w}`)));
-
-    const earnings = [];
-    fixedItems.forEach(i => earnings.push({ label: i.label, amount: +i.amount || 0, remark: '' }));
-    attEarn.forEach(i => earnings.push({ label: i.label, amount: i.earned, remark: i.lost ? `請假按比例扣 ${i.lost} 元` : '' }));
     const otParts = [];
-    if (otMin.work) otParts.push(`平日 ${dur(otMin.work)}`);
+    if (otMin.work) otParts.push(`平日 ${dur(otMin.work)}${excessMin ? `（含正常工時超出 ${dur(excessMin)}）` : ''}`);
     if (otMin.rest) otParts.push(`休息日 ${dur(otMin.rest)}`);
     if (otMin.holiday) otParts.push(`國定假日 ${dur(otMin.holiday)}`);
     if (otMin.regular) otParts.push(`例假日 ${dur(otMin.regular)}`);
     if (compMin) otParts.push(`選擇補休 ${dur(compMin)}`);
-    earnings.push({ label: '加班費', amount: otPay, remark: otParts.join('、'), auto: 'ot' });
-    if (emp.meal !== false) earnings.push({ label: '餐費', amount: mealAmt, remark: `${mealDays} 天 × ${S.mealPerDay} 元`, auto: 'meal' });
-    ((rec && rec.extras) || []).forEach(x => earnings.push({ label: x.label, amount: +x.amount || 0, remark: x.remark || '', extra: true }));
+    const otRemark = otParts.join('、');
+    earnings.push({ key: 'ot', label: '加班費', auto: otAuto, amount: otPay, autoRemark: otRemark, remark: R_('ot', otRemark), overridden: otPay !== otAuto });
+    if (emp.meal !== false) { const mr = `${mealDays} 天 × ${S.mealPerDay} 元`; earnings.push({ key: 'meal', label: '餐費', auto: mealAuto, amount: mealAmt, autoRemark: mr, remark: R_('meal', mr), overridden: mealAmt !== mealAuto }); }
+    extras.forEach(x => earnings.push(x));
 
-    const laborE = Math.round((+emp.labor || 0) * S.laborRate / 100 * S.laborEmp / 100);
-    const healthOne = Math.round((+emp.health || 0) * S.healthRate / 100 * S.healthEmp / 100);
+    // 應扣
+    const deductions = [];
+    const addD = (key, label, auto, remark) => { const amt = O(key, auto); deductions.push({ key, label, auto, amount: amt, autoRemark: remark, remark: R_(key, remark), overridden: amt !== auto }); };
     const deps = Math.min(3, +emp.deps || 0);
-    const pensionSelf = Math.round((+emp.pension || 0) * (+emp.selfPension || 0) / 100);
+    addD('labor', '勞保自付額', Math.round((+emp.labor || 0) * S.laborRate / 100 * S.laborEmp / 100), `投保 ${(+emp.labor || 0).toLocaleString()}`);
+    addD('health', '健保自付額', Math.round((+emp.health || 0) * S.healthRate / 100 * S.healthEmp / 100) * (1 + deps), deps ? `本人＋${deps} 眷屬` : '');
+    if (+emp.selfPension) addD('pension', '勞退自提', Math.round((+emp.pension || 0) * (+emp.selfPension) / 100), `${emp.selfPension}%`);
+    const latePropCap = lateMin * R / 60;
+    addD('late', '遲到早退', Math.round(S.lateMode === 'prop' ? latePropCap : Math.min(lateMin * (+S.latePerMin || 0), latePropCap)), lateMin ? `${lateMin} 分鐘` : '');
     const leaveRemark = Object.entries(leaveList).map(([k, v]) => `${k}：${v.join('、')}`).join('；');
-    const deductions = [
-      { label: '勞保自付額', amount: laborE, remark: `投保 ${(+emp.labor || 0).toLocaleString()}` },
-      { label: '健保自付額', amount: healthOne * (1 + deps), remark: deps ? `本人＋${deps} 眷屬` : '' }
-    ];
-    if (pensionSelf) deductions.push({ label: '勞退自提', amount: pensionSelf, remark: `${emp.selfPension}%` });
-    deductions.push({ label: '遲到早退', amount: lateAmt, remark: lateMin ? `${lateMin} 分鐘` : '' });
-    deductions.push({ label: '請假', amount: unpaidAmt + halfAmt, remark: leaveRemark });
-    ((rec && rec.deducts) || []).forEach(x => deductions.push({ label: x.label, amount: +x.amount || 0, remark: x.remark || '', extra: true }));
+    addD('leave', '請假', Math.round(unpaidH * R) + Math.round(halfH * R * 0.5), leaveRemark);
+    ((rec && rec.deducts) || []).forEach((x, idx) => deductions.push({ key: 'd' + idx, idx, label: x.label, amount: +x.amount || 0, remark: x.remark || '', extra: true }));
+
+    if (capMin > (+S.otCap || 46) * 60) flags.push(`本月延長工時 ${dur(capMin)}，超過每月 ${S.otCap} 小時上限（§32）`);
+    usedScheds.forEach(v => schedInfo(v).warn.forEach(w => flags.push(`班表 ${schedLabel(v)}：${w}`)));
+    rows.forEach(r => r.warn.forEach(w => flags.push(`${+r.d.slice(5, 7)}/${+r.d.slice(8)} ${w}`)));
 
     const gross = earnings.reduce((a, x) => a + x.amount, 0);
     const ded = deductions.reduce((a, x) => a + x.amount, 0);
@@ -398,8 +479,9 @@ const PAYCALC = (() => {
     const sug = { labor: bracket(LABOR_TABLE, wageTotal), health: bracket(HEALTH_TABLE, wageTotal) };
     if ((+emp.labor || 0) < Math.min(sug.labor, LABOR_TABLE[10])) flags.push(`勞保投保 ${(+emp.labor).toLocaleString()} 低於月薪對應級距 ${sug.labor.toLocaleString()}`);
     if ((+emp.health || 0) < sug.health) flags.push(`健保投保 ${(+emp.health).toLocaleString()} 低於月薪對應級距 ${sug.health.toLocaleString()}`);
+    const overrides = [...earnings, ...deductions].filter(x => x.overridden).length;
 
-    return { rows, R, dayWage, base, otPay, otMin, compMin, capMin, lateMin, lateAmt, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays };
+    return { rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
   }
 
   /* 匯入現有打卡表（員工打卡表／居家辦公打卡表格式） */
@@ -454,15 +536,12 @@ const PAYCALC = (() => {
     }
     const keys = Object.keys(days).sort();
     const month = year && mon ? `${year}-${pad(mon)}` : (keys[0] || '').slice(0, 7);
-    // 只保留該月份
     Object.keys(days).forEach(k => { if (!k.startsWith(month)) delete days[k]; });
-    // 推測班表：最常見的上下班時間
     const mode = arr => { const c = {}; arr.forEach(x => c[x] = (c[x] || 0) + 1); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0]; };
-    const ins = Object.values(days).map(x => x.out).filter(Boolean);
-    return { name, month, salary, days, typicalOut: mode(ins) };
+    return { name, month, salary, days, typicalIn: mode(Object.values(days).map(x => x.in).filter(Boolean)), typicalOut: mode(Object.values(days).map(x => x.out).filter(Boolean)) };
   }
 
-  return { DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
+  return { DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
 })();
 if (typeof module !== 'undefined') module.exports = PAYCALC;
 
@@ -549,7 +628,7 @@ function enterApp(user) {
     const next = {}; qs.docs.forEach(d => { next[d.id] = d.data(); });
     let changed = false;
     Object.keys(st.emps).forEach(id => { if (!next[id] && !dirty.has('employees/' + id)) { delete st.emps[id]; changed = true; } });
-    Object.entries(next).forEach(([id, v]) => { if (dirty.has('employees/' + id)) return; if (JSON.stringify(st.emps[id]) !== JSON.stringify(v)) { st.emps[id] = clone(v); changed = true; } });
+    Object.entries(next).forEach(([id, v]) => { if (dirty.has('employees/' + id)) return; const mv = P.migrateEmp(clone(v)); if (JSON.stringify(st.emps[id]) !== JSON.stringify(mv)) { st.emps[id] = mv; changed = true; } });
     if (st.ready && changed) render(); done();
   }, handleErr));
   unsubs.push(onSnapshot(collection(fdb, COLL.months), qs => {
@@ -559,7 +638,7 @@ function enterApp(user) {
     if (st.ready && changed) render(); done();
   }, handleErr));
   unsubs.push(onSnapshot(doc(fdb, COLL.config, 'main'), s => {
-    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
+    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
     done();
   }, handleErr));
   resetIdle();
@@ -588,7 +667,7 @@ $('#bkfile').addEventListener('change', async e => {
   try {
     const data = JSON.parse(await f.text());
     if (!data.employees || !data.months) throw new Error('不是薪資備份檔');
-    Object.entries(data.employees).forEach(([id, v]) => { st.emps[id] = v; save('employees/' + id); });
+    Object.entries(data.employees).forEach(([id, v]) => { st.emps[id] = P.migrateEmp(v); save('employees/' + id); });
     Object.entries(data.months).forEach(([k, v]) => { st.months[k] = v; save('months/' + k); });
     if (data.settings) { st.settings = Object.assign(clone(P.DEFAULT_SETTINGS), data.settings); save('config/main'); }
     st.month = null; pickDefaults(); render();
@@ -629,6 +708,7 @@ function render() {
 }
 function captureFocus() { const a = document.activeElement; if (!a || !a.dataset || !a.dataset.f) return null; return { sel: Object.entries(a.dataset).map(([k, v]) => `[data-${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${CSS.escape(v)}"]`).join('') }; }
 function restoreFocus(k) { if (!k) return; const el = document.querySelector(k.sel); if (el) { el.focus(); if (el.select && el.type === 'text') el.select(); } }
+const md = d => `${+d.slice(5, 7)}/${+d.slice(8)}`;
 
 function roster(cur) {
   const list = empList();
@@ -648,16 +728,17 @@ function viewPay() {
   const rec = getRec(emp.id, st.month);
   const r = calc(emp, st.month);
   const S = st.settings;
-  const flagHtml = r.flags.length ? `<ul class="flags">${r.flags.map(f => `<li class="${/例假|逾 12|上限/.test(f) ? 'bad' : ''}">${esc(f)}</li>`).join('')}</ul>` : '';
+  const schedTxt = r.scheds.length ? r.scheds.map(v => `${P.schedLabel(v)}，${v.ot} 起算加班`).join('；') : '';
+  const flagHtml = r.flags.length ? `<ul class="flags">${r.flags.map(f => `<li class="${/例假|逾 12|上限|§30|§35/.test(f) ? 'bad' : ''}">${esc(f)}</li>`).join('')}</ul>` : '';
   return `<div class="layout">${roster(emp.id)}<div style="min-width:0">
   <div class="emp-head">
-    <div><h2>${esc(emp.name)}</h2><div class="meta">${esc(emp.title || '未填職稱')}・班表 ${esc(emp.sched.start)}–${esc(emp.sched.end)}（休 ${emp.sched.brk} 分）・加班自 ${esc(emp.sched.ot)} 起算</div></div>
+    <div><h2>${esc(emp.name)}</h2><div class="meta">${esc(emp.title || '未填職稱')}・${emp.schedMode === 'custom' ? '自訂班表' : '公司班表'} ${esc(schedTxt)}</div></div>
     <div class="kpis">
-      <div class="kpi"><span>加班費基數</span><b>${money(r.base)}</b></div>
-      <div class="kpi"><span>平日每小時工資</span><b>${r.R.toFixed(2)}</b></div>
-      <div class="kpi"><span>延長工時</span><b>${P.dur(r.capMin)}</b></div>
-      <div class="kpi"><span>應支</span><b>${money(r.gross)}</b></div>
-      <div class="kpi net"><span>實發</span><b>${money(r.net)}</b></div>
+      <div class="kpi"><span>加班費基數</span><b class="num">${money(r.base)}</b></div>
+      <div class="kpi"><span>平日每小時工資</span><b class="num">${r.R.toFixed(2)}</b></div>
+      <div class="kpi"><span>延長工時</span><b class="num">${P.dur(r.capMin)}</b></div>
+      <div class="kpi"><span>應支</span><b class="num">${money(r.gross)}</b></div>
+      <div class="kpi net"><span>實發</span><b class="num">${money(r.net)}</b></div>
     </div>
   </div>
   ${flagHtml}
@@ -669,19 +750,19 @@ function viewPay() {
     <div class="legend"><span>外勤：佈展、出差等，不計遲到</span><span>供餐：公司已支付餐費，不發餐費</span><span>補休：勞工選擇以補休代替加班費（§32-1）</span><span>休息：加班中的休息分鐘，可填 90 或 1:30</span></div>
   </section>
   <section class="panel">
-    <div class="ph"><h2>薪資單</h2><div class="acts">${downloads ? `<button type="button" class="btn small" data-act="xone">匯出這張薪資單</button>` : ''}</div></div>
-    <div class="slip-wrap"><div class="slip-inner">${slip(emp, r)}</div></div>
-  </section>
-  <section class="panel">
-    <div class="ph"><h2>本月加項與扣項</h2></div>
+    <div class="ph"><h2>本月加項與扣項<small>系統算出的金額可直接改；空白表示用系統金額</small></h2>${r.overrides ? `<div class="acts"><button type="button" class="btn small" data-act="resetall">全部還原為系統金額</button></div>` : ''}</div>
     <div class="extras">
-      ${extraList('extras', '應支加項', (rec && rec.extras) || [], ['中秋節禮金', '端午節禮金', '代墊金額', '工作獎金', '特休假換薪資', '出差油資費補助', '過路費', '停車費'])}
-      ${extraList('deducts', '應扣項目', (rec && rec.deducts) || [], ['預支', '其他'])}
+      ${adjList('earn', '應支', r.earnings, S.quickEarn || [])}
+      ${adjList('ded', '應扣', r.deductions, S.quickDed || [])}
     </div>
     <div class="helper">特休未休折算：<input class="fi num" id="lvD" type="number" min="0" step="1" placeholder="天"> 天 <input class="fi num" id="lvH" type="number" min="0" step="0.5" placeholder="時"> 小時
       ＝ <b class="num" id="lvOut">${money(0)}</b> 元（日薪 ${r.dayWage.toFixed(2)}、時薪 ${r.R.toFixed(2)}）
       <button type="button" class="btn small" data-act="lvadd">加入應支</button></div>
     <div class="helper"><span>雇主負擔（不從薪資扣）：</span><span class="employer">勞保 <b>${money(r.employer.labor)}</b> 健保 <b>${money(r.employer.health)}</b> 勞退 ${S.pensionEr}% <b>${money(r.employer.pension)}</b> 合計 <b>${money(r.employer.labor + r.employer.health + r.employer.pension)}</b></span></div>
+  </section>
+  <section class="panel">
+    <div class="ph"><h2>薪資單</h2><div class="acts"><button type="button" class="btn small" data-act="xone">匯出這張薪資單</button></div></div>
+    <div class="slip-wrap"><div class="slip-inner">${slip(emp, r)}</div></div>
   </section>
   </div></div>`;
 }
@@ -695,8 +776,9 @@ function dayTable(emp, rec, r) {
     const cb = (k, t) => `<label class="cb" title="${t}"><input type="checkbox" ${d[k] ? 'checked' : ''} data-f="day" data-d="${x.d}" data-k="${k}" aria-label="${x.d} ${t}"></label>`;
     const typeLbl = x.type === 'holiday' ? esc(x.hol) : P.TYPE_NAME[x.type];
     const otLbl = x.ot ? P.dur(x.ot) : '';
+    const warns = [...x.warn]; if (x.excess) warns.unshift(`正常工時超過 8 小時的 ${x.excess} 分鐘已計入加班`);
     return `<tr class="${off ? 'off' : ''}">
-      <td class="dt">${+x.d.slice(5, 7)}/${+x.d.slice(8)}<i>${WK[dw]}</i></td>
+      <td class="dt">${md(x.d)}<i>${WK[dw]}</i></td>
       <td><span class="chip ${x.type}">${typeLbl}</span></td>
       <td>${ti('in')}</td><td>${ti('out')}</td>
       <td class="grp">${ti('os')}</td><td>${ti('oe')}</td>
@@ -708,19 +790,20 @@ function dayTable(emp, rec, r) {
       <td class="c num grp">${otLbl}</td>
       <td class="c num money">${x.pay ? money(x.pay) : ''}</td>
       <td class="c num">${x.late ? x.late : ''}</td>
-      <td class="c">${x.warn.length ? `<span class="warnmark" title="${esc(x.warn.join('\n'))}">⚠</span>` : ''}</td>
+      <td class="c">${warns.length ? `<span class="warnmark" title="${esc(warns.join('\n'))}">${x.warn.length ? '⚠' : 'ⓘ'}</span>` : ''}</td>
     </tr>`;
   }).join('');
   return `<table class="days"><thead><tr><th>日期</th><th>類型</th><th>上班</th><th>下班</th><th class="grp">加班起</th><th>加班迄</th><th>休息</th><th class="grp">假別</th><th>時數</th><th class="grp">外勤</th><th>供餐</th><th>補休</th><th class="grp">備註</th><th class="grp c">加班/出勤</th><th class="c">加班費</th><th class="c">遲到分</th><th></th></tr></thead><tbody>${rows}</tbody>
-  <tfoot><tr><td colspan="13" style="color:var(--muted);font-size:12px;padding-top:8px">平日 ${P.dur(r.otMin.work)}・休息日 ${P.dur(r.otMin.rest)}・國定假日 ${P.dur(r.otMin.holiday)}・例假日 ${P.dur(r.otMin.regular)}${r.compMin ? '・補休 ' + P.dur(r.compMin) : ''}</td><td class="c num grp" style="padding-top:8px">${P.dur(r.capMin)}</td><td class="c num money" style="padding-top:8px">${money(r.otPay)}</td><td class="c num" style="padding-top:8px">${r.lateMin || ''}</td><td></td></tr></tfoot></table>`;
+  <tfoot><tr><td colspan="13" style="color:var(--muted);font-size:12px;padding-top:8px">平日 ${P.dur(r.otMin.work)}${r.excessMin ? `（含正常工時超出 ${P.dur(r.excessMin)}）` : ''}・休息日 ${P.dur(r.otMin.rest)}・國定假日 ${P.dur(r.otMin.holiday)}・例假日 ${P.dur(r.otMin.regular)}${r.compMin ? '・補休 ' + P.dur(r.compMin) : ''}</td><td class="c num grp" style="padding-top:8px">${P.dur(r.capMin)}</td><td class="c num money" style="padding-top:8px">${money(r.otAuto)}</td><td class="c num" style="padding-top:8px">${r.lateMin || ''}</td><td></td></tr></tfoot></table>`;
 }
 
 function slip(emp, r) {
   const [y, m] = st.month.split('-').map(Number);
-  const n = Math.max(r.earnings.length, r.deductions.length);
+  const E = r.earnings.filter(x => x.amount || !x.extra), D = r.deductions.filter(x => x.amount || !x.extra);
+  const n = Math.max(E.length, D.length);
   const S = st.settings; let rows = '';
   for (let i = 0; i < n; i++) {
-    const a = r.earnings[i], b = r.deductions[i];
+    const a = E[i], b = D[i];
     rows += `<tr><td>${a ? esc(a.label) : ''}</td><td class="amt">${a && a.amount ? money(a.amount) : ''}</td><td class="rm">${a ? esc(a.remark) : ''}</td>
       <td class="mid">${b ? esc(b.label) : ''}</td><td class="amt">${b && b.amount ? money(b.amount) : ''}</td><td class="rm">${b ? esc(b.remark) : ''}</td></tr>`;
   }
@@ -732,13 +815,27 @@ function slip(emp, r) {
   <div class="sign"><span>主管：${esc(S.manager)}</span><span>會計：${esc(S.accountant)}</span><span>製表：${t.getFullYear() - 1911}.${t.getMonth() + 1} 月</span></div></div>`;
 }
 
-function extraList(kind, title, list, quick) {
-  return `<div><h3>${title}</h3>${list.map((x, i) => `<div class="xrow">
-    <input class="fi" type="text" value="${esc(x.label)}" data-f="extra" data-kind="${kind}" data-i="${i}" data-k="label" aria-label="項目">
-    <input class="fi num" type="text" inputmode="numeric" value="${esc(x.amount)}" data-f="extra" data-kind="${kind}" data-i="${i}" data-k="amount" aria-label="金額">
-    <input class="fi" type="text" value="${esc(x.remark || '')}" placeholder="備註" data-f="extra" data-kind="${kind}" data-i="${i}" data-k="remark" aria-label="備註">
-    <button type="button" class="btn ghost small" data-act="delx" data-kind="${kind}" data-i="${i}" aria-label="刪除">✕</button></div>`).join('') || `<p class="hint">本月沒有${title}。</p>`}
-    <div class="quick">${quick.map(q => `<button type="button" class="btn small" data-act="addx" data-kind="${kind}" data-label="${q}">＋${q}</button>`).join('')}</div></div>`;
+/* 本月加扣項：系統項目可覆寫，自訂項目可增刪 */
+function adjList(side, title, list, quick) {
+  const kind = side === 'earn' ? 'extras' : 'deducts';
+  const sys = list.filter(x => !x.extra), ext = list.filter(x => x.extra);
+  const total = list.reduce((a, x) => a + x.amount, 0);
+  return `<div class="adj"><div class="adj-h"><h3>${title}</h3><b class="num">${money(total)}</b></div>
+    <div class="adj-cols"><span>項目</span><span>系統金額</span><span>本月金額</span><span>備註</span><span></span></div>
+    ${sys.map(x => `<div class="xrow sys ${x.overridden ? 'ovr' : ''}">
+      <span class="lbl">${esc(x.label)}${x.kind === 'attendance' ? '<em>全勤</em>' : ''}</span>
+      <span class="auto num">${money(x.auto)}</span>
+      <input class="fi num" type="text" inputmode="numeric" value="${x.overridden ? esc(x.amount) : ''}" placeholder="${money(x.auto)}" data-f="ovr" data-key="${esc(x.key)}" data-k="amount" aria-label="${esc(x.label)} 本月金額">
+      <input class="fi" type="text" value="${x.remark !== x.autoRemark ? esc(x.remark) : ''}" placeholder="${esc(x.autoRemark || '備註')}" data-f="ovr" data-key="${esc(x.key)}" data-k="remark" aria-label="${esc(x.label)} 備註">
+      ${x.overridden || x.remark !== x.autoRemark ? `<button type="button" class="btn ghost small" data-act="resetovr" data-key="${esc(x.key)}" title="還原為系統金額" aria-label="還原">↺</button>` : '<span></span>'}
+    </div>`).join('')}
+    ${ext.map(x => `<div class="xrow ext">
+      <input class="fi" type="text" value="${esc(x.label)}" data-f="extra" data-kind="${kind}" data-i="${x.idx}" data-k="label" aria-label="項目名稱">
+      ${side === 'earn' ? `<label class="cb2" title="計入加班費基數（經常性給與，例如全勤獎金）"><input type="checkbox" ${x.base ? 'checked' : ''} data-f="extra" data-kind="${kind}" data-i="${x.idx}" data-k="base">計入基數</label>` : '<span class="auto">自訂</span>'}
+      <input class="fi num" type="text" inputmode="numeric" value="${esc(x.amount)}" data-f="extra" data-kind="${kind}" data-i="${x.idx}" data-k="amount" aria-label="金額">
+      <input class="fi" type="text" value="${esc(x.remark || '')}" placeholder="備註" data-f="extra" data-kind="${kind}" data-i="${x.idx}" data-k="remark" aria-label="備註">
+      <button type="button" class="btn ghost small" data-act="delx" data-kind="${kind}" data-i="${x.idx}" aria-label="刪除">✕</button></div>`).join('')}
+    <div class="quick">${quick.map(q => `<button type="button" class="btn small" data-act="addx" data-kind="${kind}" data-label="${esc(q)}">＋${esc(q)}</button>`).join('')}<button type="button" class="btn small dashed" data-act="addx" data-kind="${kind}" data-label="">＋自訂項目</button></div></div>`;
 }
 
 function viewSum() {
@@ -749,27 +846,54 @@ function viewSum() {
     const r = calc(e, st.month); const has = !!getRec(e.id, st.month);
     const er = r.employer.labor + r.employer.health + r.employer.pension;
     if (has) { T.g += r.gross; T.ot += r.otPay; T.meal += r.mealAmt; T.d += r.ded; T.n += r.net; T.er += er; }
-    return `<tr><td><button type="button" class="btn ghost small" style="color:var(--ink);padding-left:0" data-act="open" data-id="${e.id}">${esc(e.name)}</button></td><td>${has ? P.dur(r.capMin) : '—'}</td><td class="num">${has ? money(r.otPay) : '—'}</td><td class="num">${has ? money(r.mealAmt) : '—'}</td><td class="num">${has ? money(r.gross) : '—'}</td><td class="num">${has ? money(r.ded) : '—'}</td><td class="num net">${has ? money(r.net) : '—'}</td><td class="num">${has ? money(er) : '—'}</td><td>${r.flags.length && has ? `<span class="chip holiday">${r.flags.length} 項提醒</span>` : ''}</td></tr>`;
+    return `<tr><td><button type="button" class="btn ghost small" style="color:var(--ink);padding-left:0" data-act="open" data-id="${e.id}">${esc(e.name)}</button></td><td class="num">${has ? P.dur(r.capMin) : '—'}</td><td class="num">${has ? money(r.otPay) : '—'}</td><td class="num">${has ? money(r.mealAmt) : '—'}</td><td class="num">${has ? money(r.gross) : '—'}</td><td class="num">${has ? money(r.ded) : '—'}</td><td class="num net">${has ? money(r.net) : '—'}</td><td class="num">${has ? money(er) : '—'}</td><td>${has && r.flags.length ? `<span class="chip holiday">${r.flags.length} 項提醒</span>` : ''}${has && r.overrides ? ` <span class="chip rest">${r.overrides} 項手動調整</span>` : ''}</td></tr>`;
   }).join('');
-  return `<section class="panel"><div class="ph"><h2>${roc(st.month)}薪資總表</h2><div class="acts">${downloads ? '<button type="button" class="btn primary small" data-act="xall">匯出全員 Excel</button>' : ''}</div></div>
+  return `<section class="panel"><div class="ph"><h2>${roc(st.month)}薪資總表</h2><div class="acts"><button type="button" class="btn primary small" data-act="xall">匯出全員 Excel</button></div></div>
   <div class="tscroll"><table class="sum"><thead><tr><th>姓名</th><th>延長工時</th><th>加班費</th><th>餐費</th><th>應支</th><th>應扣</th><th>實發</th><th>雇主負擔</th><th></th></tr></thead><tbody>${rows}
   <tr class="tot"><td>合計</td><td></td><td class="num">${money(T.ot)}</td><td class="num">${money(T.meal)}</td><td class="num">${money(T.g)}</td><td class="num">${money(T.d)}</td><td class="num net">${money(T.n)}</td><td class="num">${money(T.er)}</td><td></td></tr></tbody></table></div>
   <p class="hint" style="margin-top:10px">雇主負擔＝勞保 ${st.settings.laborEr}%、健保 ${st.settings.healthEr}%（含平均眷口 ${st.settings.healthAvgDep}）、勞退 ${st.settings.pensionEr}%；職業災害保險費依公司費率另計。</p></section>`;
 }
+
+/* 班表版本編輯器（公司與個人共用） */
+function schedEditor(list, scope) {
+  const sorted = list.map((v, i) => ({ v, i })).sort((a, b) => a.v.from.localeCompare(b.v.from));
+  const cur = P.schedFor(scope === 'emp' ? st.emps[st.sel] : null, todayStr(), st.settings);
+  return `<div class="sched">
+    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span><span>下班</span><span>加班起算</span><span>每日正常工時</span><span></span></div>
+    ${sorted.map(({ v, i }) => {
+      const si = P.schedInfo(v);
+      const inp = (k, w) => `<input class="fi num ${w || ''}" type="${k === 'from' ? 'date' : 'text'}" value="${esc(v[k])}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="${k}" aria-label="${k}">`;
+      const isCur = scope === 'emp' ? JSON.stringify(cur) === JSON.stringify(v) && st.emps[st.sel].schedMode === 'custom' : JSON.stringify(P.schedFor(null, todayStr(), st.settings)) === JSON.stringify(v);
+      return `<div class="sv-row ${isCur ? 'cur' : ''}">
+        ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${inp('end')}${inp('ot')}
+        <span class="num ${si.normal > 480 ? 'badtxt' : ''}">${P.dur(si.normal)}${isCur ? ' <em>目前</em>' : ''}</span>
+        ${list.length > 1 ? `<button type="button" class="btn ghost small" data-act="delsv" data-scope="${scope}" data-i="${i}" aria-label="刪除這個班表">✕</button>` : '<span></span>'}
+        ${si.warn.length ? `<ul class="sv-warn">${si.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+      </div>`;
+    }).join('')}
+    <button type="button" class="btn small" data-act="addsv" data-scope="${scope}">＋新增班表（設定新的生效日）</button>
+  </div>`;
+}
+const todayStr = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
 
 function viewEmp() {
   const emp = st.emps[st.sel];
   const body = !emp ? `<section class="panel"><div class="empty"><h2>沒有選取員工</h2></div></section>` : (() => {
     const r = calc(emp, st.month);
     const f = (k, label, type = 'text', extra = '') => `<label>${label}<input class="fi ${type === 'number' ? 'num' : ''}" type="${type}" value="${esc(emp[k] ?? '')}" data-f="emp" data-k="${k}" ${extra}></label>`;
-    const s = (k, label, ph) => `<label>${label}<input class="fi num" type="text" value="${esc(emp.sched[k] ?? '')}" placeholder="${ph || ''}" data-f="sched" data-k="${k}"></label>`;
-    return `<section class="panel"><div class="ph"><h2>${esc(emp.name)}<small>基本資料與班表</small></h2>
+    return `<section class="panel"><div class="ph"><h2>${esc(emp.name)}<small>基本資料</small></h2>
       <div class="acts"><button type="button" class="btn small ${st.del === emp.id ? 'danger' : ''}" data-act="delemp">${st.del === emp.id ? '再按一次確認刪除（含所有月份）' : '刪除員工'}</button></div></div>
       <div class="form">${f('name', '姓名')}${f('title', '職稱')}${f('order', '排序', 'number')}
-        ${s('start', '上班時間', '08:00')}${s('end', '下班時間', '17:30')}${s('brk', '午休分鐘（不計薪）', '90')}${s('ot', '加班起算時間', '18:00')}
         <label class="chk"><input type="checkbox" ${emp.meal !== false ? 'checked' : ''} data-f="emp" data-k="meal">發給餐費（每出勤日 ${st.settings.mealPerDay} 元）</label>
         <label class="chk"><input type="checkbox" ${emp.active !== false ? 'checked' : ''} data-f="emp" data-k="active">在職</label>
       </div></section>
+    <section class="panel"><div class="ph"><h2>上班時間</h2></div>
+      <div class="seg" role="radiogroup" aria-label="班表">
+        <label><input type="radio" name="smode" value="company" ${emp.schedMode !== 'custom' ? 'checked' : ''} data-f="emp" data-k="schedMode">依公司班表</label>
+        <label><input type="radio" name="smode" value="custom" ${emp.schedMode === 'custom' ? 'checked' : ''} data-f="emp" data-k="schedMode">個人自訂班表</label>
+      </div>
+      ${emp.schedMode === 'custom' ? schedEditor(emp.scheds, 'emp') : `<p class="hint">目前公司班表：${esc(P.schedLabel(P.schedFor(null, todayStr(), st.settings)))}。到「規則設定」可修改或新增生效日。</p>`}
+    </section>
     <section class="panel"><div class="ph"><h2>每月固定薪資項目</h2><button type="button" class="btn small" data-act="additem">＋新增項目</button></div>
       <div class="items">${emp.items.map((it, i) => `<div class="xrow">
         <input class="fi" type="text" value="${esc(it.label)}" data-f="item" data-i="${i}" data-k="label" aria-label="項目名稱">
@@ -777,7 +901,7 @@ function viewEmp() {
         <select class="fi" data-f="item" data-i="${i}" data-k="kind" aria-label="類型"><option value="fixed" ${it.kind !== 'attendance' ? 'selected' : ''}>固定發給</option><option value="attendance" ${it.kind === 'attendance' ? 'selected' : ''}>全勤（請假按比例扣）</option></select>
         <label class="chk hint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${it.base ? 'checked' : ''} data-f="item" data-i="${i}" data-k="base">計入加班基數</label>
         <button type="button" class="btn ghost small" data-act="delitem" data-i="${i}" aria-label="刪除">✕</button></div>`).join('')}</div>
-      <p class="hint">「計入加班基數」的項目加總 ÷ 240 ＝ 平日每小時工資（目前 ${r.R.toFixed(2)} 元）。底薪、專業加給、主管加給、全勤獎金都屬經常性給與，依勞動部見解應計入。</p></section>
+      <p class="hint">「計入加班基數」的項目加總 ÷ 240 ＝ 平日每小時工資（目前 ${r.R.toFixed(2)} 元）。底薪、專業加給、主管加給、全勤獎金都屬經常性給與，依勞動部見解應計入。每月固定發的全勤獎金建議設在這裡；只有某個月才發的，到「本月薪資」加項按「＋全勤獎金」。</p></section>
     <section class="panel"><div class="ph"><h2>保險與勞退</h2></div>
       <div class="form">${f('labor', '勞保投保薪資', 'number')}${f('health', '健保投保金額', 'number')}${f('deps', '健保眷屬人數', 'number', 'min="0" max="10"')}${f('pension', '勞退月提繳工資', 'number')}${f('selfPension', '勞退自提 %', 'number', 'min="0" max="6" step="0.5"')}${f('sickYtdH', '今年已請病假時數（本月以前）', 'number')}</div>
       <p class="hint ${emp.labor < Math.min(r.sug.labor, 45800) || emp.health < r.sug.health ? 'warn' : ''}" style="margin-top:10px">依固定薪資 ${money(emp.items.reduce((a, i) => a + (+i.amount || 0), 0))} 元，對應勞保級距 ${money(r.sug.labor)}、健保級距 ${money(r.sug.health)}。病假一年未逾 10 日（80 小時）不影響全勤。</p></section>`;
@@ -789,15 +913,22 @@ function viewSet() {
   const S = st.settings;
   const f = (k, label, step = 'any', hint = '') => `<label>${label}<input class="fi num" type="number" step="${step}" value="${esc(S[k])}" data-f="set" data-k="${k}">${hint ? `<span class="hint">${hint}</span>` : ''}</label>`;
   const t = (k, label) => `<label>${label}<input class="fi" type="text" value="${esc(S[k])}" data-f="set" data-k="${k}"></label>`;
-  return `<section class="panel"><div class="ph"><h2>計算規則</h2></div>
+  return `<section class="panel"><div class="ph"><h2>公司班表<small>上班時間調整時，新增一筆並設定生效日，之前月份照舊計算</small></h2></div>
+    ${schedEditor(S.schedules || [], 'co')}
+    <p class="hint" style="margin-top:10px">每日正常工時超過 8 小時的部分，系統每天自動按平日加班計。午休、下班到加班起算之間都不計薪。</p></section>
+  <section class="panel"><div class="ph"><h2>計算規則</h2></div>
   <div class="rules">
-    <div class="rule"><span class="law">勞基法 §24 I・§32</span><h4>平日延長工時</h4><ul><li>前 2 小時 × ${S.wd1}</li><li>第 3、4 小時 × ${S.wd2}</li><li>正常工時加延長工時，一日不得逾 12 小時；每月延長工時不得逾 ${S.otCap} 小時</li></ul></div>
-    <div class="rule"><span class="law">勞基法 §24 II</span><h4>星期六・休息日</h4><ul><li>前 2 小時 × ${S.rd1}</li><li>第 3 至 8 小時 × ${S.rd2}</li><li>第 9 至 12 小時 × ${S.rd3}</li><li>依實際工作時數計，時數併入每月 ${S.otCap} 小時上限</li></ul></div>
-    <div class="rule"><span class="law">勞基法 §36・§40</span><h4>星期日・例假日</h4><ul><li>限天災、事變或突發事件才能出勤</li><li>當日工資照給，另加發 1 日工資</li><li>逾 8 小時的部分依平日加班費率計</li><li>事後須補假 1 日休息</li></ul></div>
-    <div class="rule"><span class="law">勞基法 §37・§39</span><h4>國定假日</h4><ul><li>出勤 8 小時內加發 1 日工資</li><li>逾 8 小時依平日加班費率計</li><li>假日表在下方，可依公司實際放假日調整</li></ul></div>
-    <div class="rule"><span class="law">勞基法 §2・§32-1</span><h4>工資基數與補休</h4><ul><li>平日每小時工資＝經常性給與 ÷ 30 ÷ 8</li><li>日薪＝經常性給與 ÷ 30</li><li>勞工可選擇補休代替加班費，於打卡表勾選「補休」</li></ul></div>
-    <div class="rule"><span class="law">勞工請假規則</span><h4>請假扣薪</h4><ul><li>事假、家庭照顧假不給薪</li><li>病假、生理假給半薪</li><li>特休、公假、婚喪假、補休照給</li><li>全勤：事假按比例扣；病假一年未逾 10 日不得扣</li></ul></div>
+    <div class="rule"><span class="law">勞基法 §30・§35</span><h4>正常工時與休息</h4><ul><li>每日正常工時不得超過 8 小時，每週不得超過 40 小時</li><li>連續工作 4 小時，至少休息 30 分鐘</li><li>班表超過 8 小時的部分，系統自動按加班計並提醒</li></ul></div>
+    <div class="rule"><span class="law">勞基法 §24 I・§32</span><h4>平日延長工時</h4><ul><li>前 2 小時 × ${S.wd1}（法定至少 1⅓）</li><li>第 3、4 小時 × ${S.wd2}（法定至少 1⅔）</li><li>正常加延長工時，一日不得逾 12 小時；每月延長工時不得逾 ${S.otCap} 小時</li></ul></div>
+    <div class="rule"><span class="law">勞基法 §24 II・§36</span><h4>星期六・休息日</h4><ul><li>前 2 小時 × ${S.rd1}；第 3 至 8 小時 × ${S.rd2}；第 9 至 12 小時 × ${S.rd3}</li><li>依實際工作時數計，時數併入每月 ${S.otCap} 小時上限</li><li>一日最多 12 小時</li></ul></div>
+    <div class="rule"><span class="law">勞基法 §36・§40</span><h4>星期日・例假日</h4><ul><li>限天災、事變或突發事件才能出勤</li><li>當日工資照給，另加發 1 日工資</li><li>逾 8 小時的部分依平日加班費率計，並計入每月上限</li><li>事後須補假 1 日休息</li></ul></div>
+    <div class="rule"><span class="law">勞基法 §37・§39</span><h4>國定假日</h4><ul><li>出勤 8 小時內加發 1 日工資（不論做幾小時）</li><li>逾 8 小時依平日加班費率計</li><li>假日表在下方，可依公司實際放假日調整</li></ul></div>
+    <div class="rule"><span class="law">勞基法 §2・§32-1・施行細則 §24-1</span><h4>工資基數、補休、特休折算</h4><ul><li>平日每小時工資＝經常性給與 ÷ 30 ÷ 8</li><li>勞工可選擇補休代替加班費，於打卡表勾選「補休」</li><li>特休未休折算＝日薪 × 未休日數</li></ul></div>
+    <div class="rule"><span class="law">勞工請假規則・性平法</span><h4>請假扣薪與全勤</h4><ul><li>事假、家庭照顧假不給薪；病假、生理假給半薪</li><li>特休、公假、婚喪假、補休照給</li><li>事假可按比例扣全勤；病假一年 10 日內、家庭照顧假、生理假不得扣全勤</li></ul></div>
   </div></section>
+  <section class="panel"><div class="ph"><h2>本月加扣項的常用按鈕</h2><span class="hint">一行一個，會出現在「本月薪資」的加項、扣項按鈕</span></div>
+    <div class="form"><label>應支加項<textarea class="fi small-ta" data-f="qlist" data-k="quickEarn" aria-label="應支加項清單">${esc((S.quickEarn || []).join('\n'))}</textarea></label>
+    <label>應扣項目<textarea class="fi small-ta" data-f="qlist" data-k="quickDed" aria-label="應扣項目清單">${esc((S.quickDed || []).join('\n'))}</textarea></label></div></section>
   <section class="panel"><div class="ph"><h2>公司設定</h2></div>
   <div class="form">${t('company', '公司名稱')}${t('manager', '主管（薪資單簽核）')}${t('accountant', '會計')}
     ${f('mealPerDay', '餐費（每出勤日）', '1')}
@@ -813,12 +944,13 @@ function viewSet() {
   <div class="form">${f('wd1', '平日前 2 小時')}${f('wd2', '平日第 3、4 小時')}${f('rd1', '休息日前 2 小時')}${f('rd2', '休息日第 3–8 小時')}${f('rd3', '休息日第 9–12 小時')}
     ${f('laborRate', '勞保費率 %（含就保）')}${f('laborEmp', '勞保勞工負擔 %')}${f('laborEr', '勞保雇主負擔 %')}
     ${f('healthRate', '健保費率 %')}${f('healthEmp', '健保勞工負擔 %')}${f('healthEr', '健保雇主負擔 %')}${f('healthAvgDep', '健保平均眷口數')}${f('pensionEr', '勞退雇主提繳 %')}
-  </div><p class="hint" style="margin-top:10px">預設值為 115 年度：勞保 12.5%、健保 5.17%、基本工資月薪 29,500 元。</p></section>
+  </div><p class="hint" style="margin-top:10px">預設值為 115 年度：勞保 12.5%、健保 5.17%、基本工資月薪 29,500 元。加班費率不得低於法定倍數。</p></section>
   <section class="panel"><div class="ph"><h2>國定假日與補假日</h2><span class="hint">一行一天：日期 名稱。落在週六日的節日請填實際補假日。</span></div>
   <textarea class="fi" data-f="hol" aria-label="國定假日清單">${esc((S.holidays || []).map(([d, n]) => `${d} ${n}`).join('\n'))}</textarea></section>`;
 }
 
 /* ---------- 事件 ---------- */
+const recPath = emp => 'months/' + recKey(emp.id, st.month);
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act;
@@ -830,20 +962,38 @@ document.addEventListener('click', e => {
   else if (a === 'addemp') { const emp = P.newEmployee('新員工'); emp.order = empList().length + 1; st.emps[emp.id] = emp; st.sel = emp.id; st.tab = 'emp'; save('employees/' + emp.id); render(); }
   else if (a === 'addx' || a === 'delx') {
     const emp = st.emps[st.sel]; if (!emp) return; const rec = ensureRec(emp.id, st.month); const k = b.dataset.kind; rec[k] = rec[k] || [];
-    if (a === 'addx') rec[k].push({ label: b.dataset.label, amount: 0, remark: '' }); else rec[k].splice(+b.dataset.i, 1);
-    save('months/' + recKey(emp.id, st.month)); render();
-    if (a === 'addx') { const el = document.querySelector(`[data-f="extra"][data-kind="${k}"][data-i="${rec[k].length - 1}"][data-k="amount"]`); if (el) { el.focus(); el.select(); } }
+    if (a === 'addx') { const label = b.dataset.label; rec[k].push({ label: label || '新項目', amount: 0, remark: '', base: /全勤/.test(label) }); }
+    else rec[k].splice(+b.dataset.i, 1);
+    save(recPath(emp)); render();
+    if (a === 'addx') { const el = document.querySelector(`[data-f="extra"][data-kind="${k}"][data-i="${rec[k].length - 1}"][data-k="${b.dataset.label ? 'amount' : 'label'}"]`); if (el) { el.focus(); el.select(); } }
+  }
+  else if (a === 'resetovr' || a === 'resetall') {
+    const emp = st.emps[st.sel]; const rec = getRec(emp.id, st.month); if (!rec || !rec.ovr) return;
+    if (a === 'resetall') rec.ovr = {}; else delete rec.ovr[b.dataset.key];
+    save(recPath(emp)); render();
   }
   else if (a === 'lvadd') {
     const emp = st.emps[st.sel]; const r = calc(emp, st.month); const dd = +$('#lvD').value || 0, hh = +$('#lvH').value || 0; if (!dd && !hh) { toast('請先填入未休天數或時數'); return; }
     const rec = ensureRec(emp.id, st.month); rec.extras = rec.extras || [];
-    rec.extras.push({ label: '特休假換薪資', amount: Math.round(dd * r.dayWage + hh * r.R), remark: `特休 ${dd} 天${hh ? '又 ' + hh + ' 小時' : ''}未休完，給予工資` });
-    save('months/' + recKey(emp.id, st.month)); render();
+    rec.extras.push({ label: '特休假換薪資', amount: Math.round(dd * r.dayWage + hh * r.R), remark: `特休 ${dd} 天${hh ? '又 ' + hh + ' 小時' : ''}未休完，給予工資`, base: false });
+    save(recPath(emp)); render();
   }
   else if (a === 'fillstd') {
     const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); const r = calc(emp, st.month); let n = 0;
-    r.rows.forEach(x => { if (x.type !== 'work') return; const d = rec.days[x.d] || {}; if (d.in || d.out || d.leave) return; rec.days[x.d] = Object.assign(d, { in: emp.sched.start, out: emp.sched.end }); n++; });
-    save('months/' + recKey(emp.id, st.month)); render(); toast(n ? `已填入 ${n} 個工作日` : '沒有空白的工作日');
+    r.rows.forEach(x => { if (x.type !== 'work') return; const d = rec.days[x.d] || {}; if (d.in || d.out || d.leave) return; rec.days[x.d] = Object.assign(d, { in: x.sched.start, out: x.sched.end }); n++; });
+    save(recPath(emp)); render(); toast(n ? `已填入 ${n} 個工作日` : '沒有空白的工作日');
+  }
+  else if (a === 'addsv' || a === 'delsv') {
+    const isCo = b.dataset.scope === 'co'; const emp = st.emps[st.sel];
+    const list = isCo ? (st.settings.schedules = st.settings.schedules || clone(P.DEFAULT_SETTINGS.schedules)) : emp.scheds;
+    if (a === 'addsv') {
+      const last = [...list].sort((x, y) => x.from.localeCompare(y.from)).pop() || { start: '08:00', ls: '12:00', le: '13:00', end: '17:00', ot: '17:00' };
+      const t = new Date(); const nx = new Date(t.getFullYear(), t.getMonth() + 1, 1);
+      let from = `${nx.getFullYear()}-${String(nx.getMonth() + 1).padStart(2, '0')}-01`; if (last.from && last.from >= from) { const [y, m] = last.from.split('-').map(Number); const d = new Date(y, m, 1); from = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
+      list.push({ ...last, from });
+      toast(`已新增 ${from} 起的班表，請修改時間`);
+    } else list.splice(+b.dataset.i, 1);
+    save(isCo ? 'config/main' : 'employees/' + emp.id); render();
   }
   else if (a === 'additem') { const emp = st.emps[st.sel]; emp.items.push({ label: '新項目', amount: 0, base: true, kind: 'fixed' }); save('employees/' + emp.id); render(); }
   else if (a === 'delitem') { const emp = st.emps[st.sel]; emp.items.splice(+b.dataset.i, 1); save('employees/' + emp.id); render(); }
@@ -863,6 +1013,7 @@ document.addEventListener('input', e => {
   if (e.target.id === 'lvD' || e.target.id === 'lvH') { const emp = st.emps[st.sel]; const r = calc(emp, st.month); $('#lvOut').textContent = money((+$('#lvD').value || 0) * r.dayWage + (+$('#lvH').value || 0) * r.R); }
 });
 
+const toInt = v => { const n = parseInt(String(v).replace(/[,，\s]/g, ''), 10); return isNaN(n) ? null : n; };
 document.addEventListener('change', e => {
   const el = e.target; const f = el.dataset && el.dataset.f; if (!f) return;
   const val = el.type === 'checkbox' ? el.checked : el.value;
@@ -875,27 +1026,41 @@ document.addEventListener('change', e => {
     else if (typeof val === 'boolean') { if (val) d[k] = true; else delete d[k]; }
     else { if (val.trim()) d[k] = val.trim(); else delete d[k]; }
     if (!Object.keys(d).length) delete rec.days[el.dataset.d];
-    save('months/' + recKey(emp.id, st.month));
+    save(recPath(emp));
+  } else if (f === 'ovr') {
+    const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); rec.ovr = rec.ovr || {};
+    const key = el.dataset.key; const o = rec.ovr[key] = rec.ovr[key] || {};
+    if (el.dataset.k === 'amount') { if (String(val).trim() === '') delete o.amount; else { const n = toInt(val); if (n === null) { toast('金額請填數字'); render(); return; } o.amount = n; } }
+    else { if (String(val).trim()) o.remark = val.trim(); else delete o.remark; }
+    if (!Object.keys(o).length) delete rec.ovr[key];
+    save(recPath(emp));
   } else if (f === 'extra') {
     const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); const x = rec[el.dataset.kind][+el.dataset.i]; const k = el.dataset.k;
-    x[k] = k === 'amount' ? (parseInt(String(val).replace(/[,，]/g, ''), 10) || 0) : val;
-    save('months/' + recKey(emp.id, st.month));
+    x[k] = k === 'amount' ? (toInt(val) || 0) : val;
+    save(recPath(emp));
   } else if (f === 'emp') {
     const emp = st.emps[st.sel]; const k = el.dataset.k;
-    if (['order', 'labor', 'health', 'deps', 'pension', 'selfPension', 'sickYtdH'].includes(k)) emp[k] = parseFloat(val) || 0; else emp[k] = val;
+    if (['order', 'labor', 'health', 'deps', 'pension', 'selfPension', 'sickYtdH'].includes(k)) emp[k] = parseFloat(val) || 0;
+    else if (k === 'schedMode') { emp.schedMode = val; if (val === 'custom' && (!emp.scheds || !emp.scheds.length)) emp.scheds = [clone(P.schedFor(null, todayStr(), st.settings))]; }
+    else emp[k] = val;
     save('employees/' + emp.id);
-  } else if (f === 'sched') {
-    const emp = st.emps[st.sel]; const k = el.dataset.k;
-    if (k === 'brk') emp.sched.brk = parseInt(val, 10) || 0; else { const t = normTime(val); if (!t) { toast('時間格式請用 08:00'); render(); return; } emp.sched[k] = t; }
-    save('employees/' + emp.id);
+  } else if (f === 'sv') {
+    const isCo = el.dataset.scope === 'co'; const emp = st.emps[st.sel];
+    const list = isCo ? st.settings.schedules : emp.scheds; const v = list[+el.dataset.i]; const k = el.dataset.k;
+    if (k === 'from') { if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) { toast('請選擇生效日'); render(); return; } v.from = val; }
+    else { const t = normTime(val); if (!t) { toast('時間格式請用 08:00'); render(); return; } v[k] = t; if (k === 'end' && P.toMin(v.ot) < P.toMin(t)) v.ot = t; }
+    const si = P.schedInfo(v); if (!(si.s < si.ls && si.ls <= si.le && si.le < si.e)) toast('時間順序應為：上班 < 午休開始 ≤ 午休結束 < 下班');
+    save(isCo ? 'config/main' : 'employees/' + emp.id);
   } else if (f === 'item') {
     const emp = st.emps[st.sel]; const it = emp.items[+el.dataset.i]; const k = el.dataset.k;
-    it[k] = k === 'amount' ? (parseInt(String(val).replace(/[,，]/g, ''), 10) || 0) : val;
+    it[k] = k === 'amount' ? (toInt(val) || 0) : val;
     save('employees/' + emp.id);
   } else if (f === 'set') {
     const k = el.dataset.k; const S = st.settings;
     if (typeof val === 'boolean' || ['company', 'manager', 'accountant', 'lateMode', 'fieldWords', 'mealWords'].includes(k)) S[k] = val; else S[k] = parseFloat(val) || 0;
     save('config/main');
+  } else if (f === 'qlist') {
+    st.settings[el.dataset.k] = String(val).split('\n').map(s => s.trim()).filter(Boolean); save('config/main');
   } else if (f === 'hol') {
     const list = []; let bad = 0;
     String(val).split('\n').forEach(line => { const m = /^\s*(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\s*(.*)$/.exec(line); if (m) list.push([`${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`, m[4].trim() || '國定假日']); else if (line.trim()) bad++; });
@@ -925,7 +1090,10 @@ async function importFiles(files) {
         emp = P.newEmployee(parsed.name); emp.order = empList().length + 1;
         if (parsed.salary) emp.items = [{ label: '底薪', amount: parsed.salary, base: true, kind: 'fixed' }];
         const wage = parsed.salary || 30000; emp.labor = P.bracket(P.LABOR_TABLE, wage); emp.health = emp.pension = P.bracket(P.HEALTH_TABLE, wage);
-        if (parsed.typicalOut && parsed.typicalOut !== '17:30') { const o = P.toMin(parsed.typicalOut); emp.sched.end = parsed.typicalOut; emp.sched.ot = P.fmtMin(o + 30); emp.sched.start = P.fmtMin(o - 480 - emp.sched.brk); }
+        const co = P.schedFor(null, parsed.month + '-01', st.settings);
+        if (parsed.typicalIn && parsed.typicalOut && (parsed.typicalIn !== co.start || parsed.typicalOut !== co.end)) {
+          emp.schedMode = 'custom'; emp.scheds = [{ ...co, from: '2000-01-01', start: parsed.typicalIn, end: parsed.typicalOut, ot: parsed.typicalOut }];
+        } else emp.schedMode = 'company';
         st.emps[emp.id] = emp; save('employees/' + emp.id);
       }
       const rec = ensureRec(emp.id, parsed.month); rec.days = parsed.days;
