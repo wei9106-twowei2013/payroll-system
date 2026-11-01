@@ -479,7 +479,8 @@ const PAYCALC = (() => {
         if (tout != null && !day.field && !lv && toMin(day.os) == null && tout < si.e) r.late += si.e - tout;
         lateMin += r.late;
         if (tin == null && !lv && !day.field) r.warn.push('無打卡紀錄，請填假別');
-        if ((tin != null || day.field) && lvH < 8 && emp.mealMode !== 'none' && !day.meal) mealDays++;
+        if (emp.mealMode === 'field') { if (day.field && !day.meal && lvH < 8) mealDays++; }
+        else if ((tin != null || day.field) && lvH < 8 && emp.mealMode !== 'none' && !day.meal) mealDays++;
         // 正常工時超過 8 小時的部分（§30）
         let worked = 0;
         if (tin != null && tout != null) { const a = Math.max(tin, si.s), b = Math.min(tout >= tin ? tout : tout + 1440, si.e); worked = si.segs.reduce((t, [, x, y]) => t + overlap(a, b, x, y), 0); }
@@ -500,6 +501,7 @@ const PAYCALC = (() => {
         }
       } else {
         const m = floorU(span(day, si), S.unit);
+        if (emp.mealMode === 'field' && day.field && !day.meal && (m > 0 || day.in || day.os)) mealDays++;
         r.ot = m;
         if (m > 0) {
           if (type === 'rest') {
@@ -566,7 +568,7 @@ const PAYCALC = (() => {
     if (compMin) otParts.push(`選擇補休 ${dur(compMin)}`);
     const otRemark = otParts.join('、');
     earnings.push({ key: 'ot', label: '加班費', auto: otAuto, amount: otPay, autoRemark: otRemark, remark: R_('ot', otRemark), overridden: otPay !== otAuto });
-    if (emp.mealMode !== 'none') { const mr = emp.mealMode === 'fixed' ? '每月固定' : `${mealDays} 天 × ${mealPer} 元`; earnings.push({ key: 'meal', label: '餐費', auto: mealAuto, amount: mealAmt, autoRemark: mr, remark: R_('meal', mr), overridden: mealAmt !== mealAuto }); }
+    if (emp.mealMode !== 'none') { const mr = emp.mealMode === 'fixed' ? '每月固定' : emp.mealMode === 'field' ? `外勤 ${mealDays} 天 × ${mealPer} 元` : `${mealDays} 天 × ${mealPer} 元`; earnings.push({ key: 'meal', label: '餐費', auto: mealAuto, amount: mealAmt, autoRemark: mr, remark: R_('meal', mr), overridden: mealAmt !== mealAuto }); }
     extras.forEach(x => earnings.push(x));
 
     // 應扣
@@ -1046,8 +1048,8 @@ function viewEmp() {
       <div class="acts"><button type="button" class="btn small ${st.del === emp.id ? 'danger' : ''}" data-act="delemp">${st.del === emp.id ? '再按一次確認刪除（含所有月份）' : '刪除員工'}</button></div></div>
       <div class="form">${f('name', '姓名')}${f('title', '職稱')}${f('order', '排序', 'number')}
         <label>到職日<input class="fi num" type="text" inputmode="numeric" value="${esc(slash(emp.hire || ''))}" placeholder="例 2024/10/01 或 113/10/1" data-f="emp" data-k="hire"></label>
-        <label>餐費補助<select class="fi" data-f="emp" data-k="mealMode"><option value="daily" ${emp.mealMode === 'daily' ? 'selected' : ''}>依出勤天數</option><option value="fixed" ${emp.mealMode === 'fixed' ? 'selected' : ''}>每月固定金額</option><option value="none" ${emp.mealMode === 'none' ? 'selected' : ''}>不發</option></select></label>
-        ${emp.mealMode === 'daily' ? `<label>每出勤日餐費（元）<input class="fi num" type="text" inputmode="numeric" value="${esc(emp.mealPerDay ?? '')}" placeholder="空白＝公司預設 ${st.settings.mealPerDay}" data-f="emp" data-k="mealPerDay"></label>` : ''}
+        <label>餐費補助<select class="fi" data-f="emp" data-k="mealMode"><option value="daily" ${emp.mealMode === 'daily' ? 'selected' : ''}>依出勤天數</option><option value="field" ${emp.mealMode === 'field' ? 'selected' : ''}>僅外勤日（公司未供餐）</option><option value="fixed" ${emp.mealMode === 'fixed' ? 'selected' : ''}>每月固定金額</option><option value="none" ${emp.mealMode === 'none' ? 'selected' : ''}>不發</option></select></label>
+        ${emp.mealMode === 'daily' || emp.mealMode === 'field' ? `<label>${emp.mealMode === 'field' ? '每外勤日餐費（元）' : '每出勤日餐費（元）'}<input class="fi num" type="text" inputmode="numeric" value="${esc(emp.mealPerDay ?? '')}" placeholder="空白＝公司預設 ${st.settings.mealPerDay}" data-f="emp" data-k="mealPerDay"></label>` : ''}
         ${emp.mealMode === 'fixed' ? `<label>每月餐費（元）<input class="fi num" type="text" inputmode="numeric" value="${esc(emp.mealFixed || 0)}" data-f="emp" data-k="mealFixed"></label>` : ''}
         <label class="chk"><input type="checkbox" ${emp.active !== false ? 'checked' : ''} data-f="emp" data-k="active">在職</label>
       </div></section>
