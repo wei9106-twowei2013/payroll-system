@@ -197,6 +197,9 @@ textarea.fi.small-ta{min-height:150px}
 .seg label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .sched{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
 .sv-h,.sv-row{display:grid;grid-template-columns:130px repeat(5,78px) 110px 28px;gap:6px;align-items:center;min-width:760px}
+.sched.ext .sv-h,.sched.ext .sv-row{grid-template-columns:118px repeat(9,68px) 96px 28px;min-width:950px}
+.sched .fi.opt{border-style:dashed}
+.sched .sv-h span{white-space:nowrap}
 .sv-h{font-size:11.5px;color:var(--muted)}
 .sv-row{padding:6px;border:1px solid var(--line);border-radius:var(--r)}
 .sv-row.cur{border-color:var(--accent)}
@@ -324,17 +327,28 @@ const PAYCALC = (() => {
   };
 
   /* 班表 */
+  /* 班表：上午一段＋下午一段，個人班表可再加下午第 2、3 段（中間離開不計薪） */
   const schedInfo = v => {
-    const s = toMin(v.start), ls = toMin(v.ls), le = toMin(v.le), e = toMin(v.end), ot = toMin(v.ot);
-    const am = Math.max(0, ls - s), pm = Math.max(0, e - le);
-    const normal = am + pm, lunch = Math.max(0, le - ls);
+    const s = toMin(v.start), ls = toMin(v.ls), le = toMin(v.le), e1 = toMin(v.end);
+    const segs = [['上午', s, ls], ['下午', le, e1]];
+    [['p2s', 'p2e', '下午第 2 段'], ['p3s', 'p3e', '下午第 3 段']].forEach(([a, b, n]) => { const x = toMin(v[a]), y = toMin(v[b]); if (x != null && y != null) segs.push([n, x, y]); });
     const warn = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (!(segs[i][2] > segs[i][1])) warn.push(`${segs[i][0]}的結束時間要晚於開始時間`);
+      if (i && segs[i][1] < segs[i - 1][2]) warn.push(`${segs[i][0]}的開始時間要晚於${segs[i - 1][0]}的結束時間`);
+    }
+    const e = Math.max(...segs.map(x => x[2]));
+    const ot = toMin(v.ot) ?? e;
+    const lens = segs.map(([n, a, b]) => [n, Math.max(0, b - a)]);
+    const normal = lens.reduce((t, x) => t + x[1], 0);
+    const gaps = segs.slice(1).map((x, i) => [segs[i][2], x[1]]).filter(([a, b]) => b > a);
+    const am = lens[0][1], pm = lens[1][1], lunch = Math.max(0, le - ls);
     if (normal > 480) warn.push(`正常工時 ${dur(normal)}，超過每日 8 小時（§30），超出的 ${normal - 480} 分鐘每天自動按平日加班計`);
-    if (am > 240 || pm > 240) warn.push(`${am > 240 ? '上午' : '下午'}連續工作 ${dur(Math.max(am, pm))}，超過 4 小時須至少休息 30 分鐘（§35）`);
-    if (ot > e) warn.push(`${v.end} 下班到 ${v.ot} 加班起算之間須讓員工實際休息，期間若在工作仍應計加班`);
-    if (ot < e) warn.push('加班起算時間早於下班時間');
+    lens.filter(x => x[1] > 240).forEach(([n, m]) => warn.push(`${n}連續工作 ${dur(m)}，超過 4 小時須至少休息 30 分鐘（§35）`));
+    if (ot > e) warn.push(`${fmtMin(e)} 下班到 ${v.ot} 加班起算之間須讓員工實際休息，期間若在工作仍應計加班`);
+    if (ot < e) warn.push('加班起算時間早於最後一段下班時間');
     if (lunch < 30 && am + pm > 240) warn.push('午休少於 30 分鐘（§35）');
-    return { s, ls, le, e, ot, normal, am, pm, lunch, warn };
+    return { s, ls, le, e, ot, normal, am, pm, lunch, segs, gaps, warn };
   };
   const schedList = (emp, S) => (emp && emp.schedMode === 'custom' && emp.scheds && emp.scheds.length) ? emp.scheds : (S.schedules || DEFAULT_SETTINGS.schedules);
   const schedFor = (emp, date, S) => {
@@ -342,7 +356,7 @@ const PAYCALC = (() => {
     let v = list[0]; for (const x of list) if (x.from <= date) v = x;
     return v;
   };
-  const schedLabel = v => `${v.start}–${v.ls}、${v.le}–${v.end}`;
+  const schedLabel = v => [`${v.start}–${v.ls}`, `${v.le}–${v.end}`, ...(v.p2s && v.p2e ? [`${v.p2s}–${v.p2e}`] : []), ...(v.p3s && v.p3e ? [`${v.p3s}–${v.p3e}`] : [])].join('、');
 
   /* 舊資料（start/end/brk/ot）轉成班表版本 */
   function migrateEmp(emp) {
@@ -405,7 +419,7 @@ const PAYCALC = (() => {
     if (s == null || e == null) { s = toMin(day.in); e = toMin(day.out); fromPunch = true; }
     if (s == null || e == null) return 0;
     if (e <= s) e += 1440;
-    if (fromPunch && !day.rest) rest = overlap(s, e, si.ls, si.le);
+    if (fromPunch && !day.rest) rest = si.gaps.reduce((t, [a, b]) => t + overlap(s, e, a, b), 0);
     return Math.max(0, e - s - rest);
   }
 
@@ -439,7 +453,7 @@ const PAYCALC = (() => {
         if ((tin != null || day.field) && lvH < 8 && emp.mealMode !== 'none' && !day.meal) mealDays++;
         // 正常工時超過 8 小時的部分（§30）
         let worked = 0;
-        if (tin != null && tout != null) { const a = Math.max(tin, si.s), b = Math.min(tout >= tin ? tout : tout + 1440, si.e); worked = overlap(a, b, si.s, si.ls) + overlap(a, b, si.le, si.e); }
+        if (tin != null && tout != null) { const a = Math.max(tin, si.s), b = Math.min(tout >= tin ? tout : tout + 1440, si.e); worked = si.segs.reduce((t, [, x, y]) => t + overlap(a, b, x, y), 0); }
         else if (day.field && !lv) worked = si.normal;
         r.excess = Math.max(0, worked - 480);
         // 下班後加班
@@ -962,22 +976,24 @@ function viewSum() {
 function schedEditor(list, scope) {
   const sorted = list.map((v, i) => ({ v, i })).sort((a, b) => a.v.from.localeCompare(b.v.from));
   const cur = P.schedFor(scope === 'emp' ? st.emps[st.sel] : null, todayStr(), st.settings);
-  return `<div class="sched">
-    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span><span>下班</span><span>加班起算</span><span>每日正常工時</span><span></span></div>
+  const ext = scope === 'emp';
+  return `<div class="sched ${ext ? 'ext' : ''}">
+    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span><span>${ext ? '下午下班' : '下班'}</span>${ext ? '<span>第 2 段開始</span><span>第 2 段結束</span><span>第 3 段開始</span><span>第 3 段結束</span>' : ''}<span>加班起算</span><span>每日正常工時</span><span></span></div>
     ${sorted.map(({ v, i }) => {
       const si = P.schedInfo(v);
       const inp = (k, w) => k === 'from'
         ? `<input class="fi num" type="text" inputmode="numeric" value="${v.from <= '2000-01-01' ? '' : esc(v.from.replace(/-/g, '/'))}" placeholder="${v.from <= '2000-01-01' ? '最早（不限）' : '2026/12/01'}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="from" aria-label="生效日，例如 2026/12/01 或 115/12/1">`
-        : `<input class="fi num ${w || ''}" type="text" inputmode="numeric" value="${esc(v[k])}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="${k}" aria-label="${k}">`;
+        : `<input class="fi num ${w || ''}" type="text" inputmode="numeric" value="${esc(v[k] || '')}" ${w === 'opt' ? 'placeholder="—"' : ''} data-f="sv" data-scope="${scope}" data-i="${i}" data-k="${k}" aria-label="${k}">`;
       const isCur = scope === 'emp' ? JSON.stringify(cur) === JSON.stringify(v) && st.emps[st.sel].schedMode === 'custom' : JSON.stringify(P.schedFor(null, todayStr(), st.settings)) === JSON.stringify(v);
       return `<div class="sv-row ${isCur ? 'cur' : ''}">
-        ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${inp('end')}${inp('ot')}
+        ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${inp('end')}${ext ? inp('p2s', 'opt') + inp('p2e', 'opt') + inp('p3s', 'opt') + inp('p3e', 'opt') : ''}${inp('ot')}
         <span class="num ${si.normal > 480 ? 'badtxt' : ''}">${P.dur(si.normal)}${isCur ? ' <em>目前</em>' : ''}</span>
         ${list.length > 1 ? `<button type="button" class="btn ghost small" data-act="delsv" data-scope="${scope}" data-i="${i}" aria-label="刪除這個班表">✕</button>` : '<span></span>'}
         ${si.warn.length ? `<ul class="sv-warn">${si.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
       </div>`;
     }).join('')}
     <button type="button" class="btn small" data-act="addsv" data-scope="${scope}">＋新增班表（設定新的生效日）</button>
+    ${ext ? '<p class="hint">在家工作中途需要離開的，可填下午第 2、3 段的開始與結束；兩段之間不計薪。不需要就留空。加班從最後一段結束後起算。</p>' : ''}
   </div>`;
 }
 /* 生效日：接受 2026/12/1、2026-12-01、20261201、民國 115/12/1；空白＝最早 */
@@ -1118,7 +1134,7 @@ document.addEventListener('click', e => {
   }
   else if (a === 'fillstd') {
     const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); const r = calc(emp, st.month); let n = 0;
-    r.rows.forEach(x => { if (x.type !== 'work') return; const d = rec.days[x.d] || {}; if (d.in || d.out || d.leave) return; rec.days[x.d] = Object.assign(d, { in: x.sched.start, out: x.sched.end }); n++; });
+    r.rows.forEach(x => { if (x.type !== 'work') return; const d = rec.days[x.d] || {}; if (d.in || d.out || d.leave) return; rec.days[x.d] = Object.assign(d, { in: x.sched.start, out: P.fmtMin(P.schedInfo(x.sched).e) }); n++; });
     save(recPath(emp)); render(); toast(n ? `已填入 ${n} 個工作日` : '沒有空白的工作日');
   }
   else if (a === 'addsv' || a === 'delsv') {
@@ -1191,8 +1207,14 @@ document.addEventListener('change', e => {
     const isCo = el.dataset.scope === 'co'; const emp = st.emps[st.sel];
     const list = isCo ? st.settings.schedules : emp.scheds; const v = list[+el.dataset.i]; const k = el.dataset.k;
     if (k === 'from') { const d = parseDate(val); if (!d) { toast('生效日請填 2026/12/01 或民國 115/12/1'); render(); return; } v.from = d; }
-    else { const t = normTime(val); if (!t) { toast('時間格式請用 08:00'); render(); return; } v[k] = t; if (k === 'end' && P.toMin(v.ot) < P.toMin(t)) v.ot = t; }
-    const si = P.schedInfo(v); if (!(si.s < si.ls && si.ls <= si.le && si.le < si.e)) toast('時間順序應為：上班 < 午休開始 ≤ 午休結束 < 下班');
+    else {
+      const t = normTime(val);
+      if (t === '' && /^p[23][se]$/.test(k)) delete v[k];
+      else if (!t) { toast('時間格式請用 08:00'); render(); return; }
+      else v[k] = t;
+      if (k !== 'ot') { const e2 = P.schedInfo(v).e; if (P.toMin(v.ot) < e2) v.ot = P.fmtMin(e2); }
+    }
+    const si = P.schedInfo(v); const bad = si.warn.find(w => w.includes('要晚於')); if (bad) toast(bad);
     save(isCo ? 'config/main' : 'employees/' + emp.id);
   } else if (f === 'item') {
     const emp = st.emps[st.sel]; const it = emp.items[+el.dataset.i]; const k = el.dataset.k;
