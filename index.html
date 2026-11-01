@@ -43,7 +43,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 button,input,select,textarea{font:inherit;color:inherit}
 .num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
 body,button,input,select,textarea,table{font-family:var(--f-body)}
-.wrap{max-width:1360px;margin:0 auto;padding-inline:16px;padding-block:14px 48px}
+.wrap{max-width:1600px;margin:0 auto;padding-inline:16px;padding-block:14px 48px}
 header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:6px 14px;border-bottom:1px solid var(--line);margin-bottom:16px}
 .brand{display:flex;align-items:baseline;gap:10px}
 .brand h1{font-family:var(--f-display);font-size:22px;margin:0;letter-spacing:.08em}
@@ -57,18 +57,18 @@ nav.tabs button{border:0;background:none;padding:7px 14px;border-radius:var(--r)
 nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
 nav.tabs button:hover:not([aria-selected="true"]){background:var(--sunk);color:var(--ink)}
 .banner{padding:10px 14px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn);margin-bottom:14px}
-.layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:20px;align-items:start}
-@media (max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}}
+.layout{display:grid;grid-template-columns:200px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:1180px){.layout{grid-template-columns:minmax(0,1fr)}}
 aside.roster{display:flex;flex-direction:column;gap:6px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
-@media (max-width:860px){aside.roster{position:static;flex-direction:row;flex-wrap:wrap}}
+@media (max-width:1180px){aside.roster{position:static;flex-direction:row;flex-wrap:wrap}}
 .who{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid transparent;background:none;padding:9px 11px;border-radius:var(--r);cursor:pointer}
-@media (max-width:860px){.who{width:auto}}
+@media (max-width:1180px){.who{width:auto}}
 .who:hover{background:var(--surface);border-color:var(--line)}
 .who[aria-current="true"]{background:var(--surface);border-color:var(--accent)}
 .who .n{font-weight:500}.who .t{display:block;font-size:12px;color:var(--muted)}
 .who .v{font-size:12.5px;color:var(--accent)}
 .side-actions{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:10px;border-top:1px solid var(--line)}
-@media (max-width:860px){.side-actions{flex-direction:row;border:0;margin:0;padding:0}}
+@media (max-width:1180px){.side-actions{flex-direction:row;border:0;margin:0;padding:0}}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:var(--r);cursor:pointer;white-space:nowrap}
 .btn:hover{border-color:var(--ink)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
@@ -94,23 +94,31 @@ section.panel{background:var(--surface);border:1px solid var(--line);border-radi
 .flags li{padding:6px 10px;border-radius:var(--r);background:var(--warn-soft);color:var(--warn);font-size:13px}
 .flags li.bad{background:var(--bad-soft);color:var(--bad)}
 .tscroll{overflow-x:auto;margin-inline:-4px;padding-inline:4px}
-table.days{border-collapse:collapse;width:100%;min-width:1180px;font-size:13px}
-table.days th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
-table.days td{padding:3px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.days{border-collapse:collapse;width:100%;min-width:900px;font-size:13px;table-layout:fixed}
+/* 欄寬：日期 類型 上班 下班 加班起 加班迄 休息 假別 時數 外勤 供餐 補休 備註(其餘) 加班/出勤 加班費 遲到 提醒 */
+table.days th:nth-child(1){width:54px}table.days th:nth-child(2){width:64px}
+table.days th:nth-child(3),table.days th:nth-child(4),table.days th:nth-child(5),table.days th:nth-child(6){width:54px}
+table.days th:nth-child(7){width:38px}table.days th:nth-child(8){width:74px}table.days th:nth-child(9){width:38px}
+table.days th:nth-child(10),table.days th:nth-child(11),table.days th:nth-child(12){width:30px;text-align:center}
+table.days th:nth-child(14){width:58px}table.days th:nth-child(15){width:60px}table.days th:nth-child(16){width:42px}table.days th:nth-child(17){width:18px}
+table.days td{overflow:hidden}
+table.days .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+table.days th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:6px 3px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--surface)}
+table.days td{padding:3px 3px;border-bottom:1px solid var(--line);vertical-align:middle}
 table.days tr.off td{background:var(--sunk)}
 table.days td.c{text-align:right;white-space:nowrap}
-table.days .grp{border-left:2px solid var(--line);padding-left:8px}
-.ti{width:62px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;font-family:var(--f-num);font-size:13px}
+table.days .grp{border-left:2px solid var(--line);padding-left:5px}
+.ti{width:100%;padding:4px 4px;border:1px solid transparent;border-radius:4px;background:transparent;font-family:var(--f-num);font-size:13px}
 .ti:hover{border-color:var(--line)} .ti:focus{border-color:var(--accent);background:var(--surface);outline:none}
-.ti.w40{width:44px}.ti.wnote{width:100%;min-width:140px;font-family:var(--f-body)}
-select.ti{width:auto;font-family:var(--f-body);padding-right:2px}
+.ti.w40{width:100%}.ti.wnote{width:100%;min-width:0;font-family:var(--f-body)}
+select.ti{width:100%;font-family:var(--f-body);padding-right:0}
 .chip{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;white-space:nowrap}
 .chip.work{color:var(--muted)} .chip.rest{background:var(--accent-soft);color:var(--accent)}
 .chip.regular{background:var(--bad-soft);color:var(--bad)} .chip.holiday{background:var(--warn-soft);color:var(--warn)}
 .dt{font-family:var(--f-num);white-space:nowrap}.dt i{font-style:normal;color:var(--muted);font-family:var(--f-body);font-size:12px;margin-left:4px}
 .warnmark{color:var(--warn);cursor:help}
 td.money{color:var(--accent)}
-.cb{display:inline-flex;align-items:center;justify-content:center;width:26px}
+.cb{display:flex;align-items:center;justify-content:center;width:100%}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px;margin-top:10px}
 /* 薪資單 */
 .slip{border:1px solid var(--ink);max-width:880px}
@@ -327,26 +335,46 @@ const PAYCALC = (() => {
   };
 
   /* 班表 */
-  /* 班表：上午一段＋下午一段，個人班表可再加下午第 2、3 段（中間離開不計薪） */
-  const schedInfo = v => {
-    const s = toMin(v.start), ls = toMin(v.ls), le = toMin(v.le), e1 = toMin(v.end);
-    const segs = [['上午', s, ls], ['下午', le, e1]];
-    [['p2s', 'p2e', '下午第 2 段'], ['p3s', 'p3e', '下午第 3 段']].forEach(([a, b, n]) => { const x = toMin(v[a]), y = toMin(v[b]); if (x != null && y != null) segs.push([n, x, y]); });
-    const warn = [];
-    for (let i = 0; i < segs.length; i++) {
-      if (!(segs[i][2] > segs[i][1])) warn.push(`${segs[i][0]}的結束時間要晚於開始時間`);
-      if (i && segs[i][1] < segs[i - 1][2]) warn.push(`${segs[i][0]}的開始時間要晚於${segs[i - 1][0]}的結束時間`);
+  /* 班表：上午 start–ls；下午 le–end，中途可離開／回來兩次（b1s–b1e、b2s–b2e 不計薪） */
+  const normSched = v => {
+    // 舊格式（下午第 2、3 段 p2s/p2e/p3s/p3e）轉成離開／回來
+    if (v && (v.p2s || v.p2e || v.p3s || v.p3e)) {
+      const t = toMin, okP2 = v.p2s && v.p2e && t(v.end) <= t(v.p2s) && t(v.p2s) < t(v.p2e);
+      const okP3 = okP2 && v.p3s && v.p3e && t(v.p2e) <= t(v.p3s) && t(v.p3s) < t(v.p3e);
+      if (okP2) { v.b1s = v.end; v.b1e = v.p2s; v.end = v.p2e; }
+      if (okP3) { v.b2s = v.end; v.b2e = v.p3s; v.end = v.p3e; }
+      delete v.p2s; delete v.p2e; delete v.p3s; delete v.p3e;
+      if (!okP2 && toMin(v.ot) > toMin(v.end)) v.ot = v.end;
     }
-    const e = Math.max(...segs.map(x => x[2]));
+    return v;
+  };
+  const schedInfo = v0 => {
+    const v = normSched({ ...v0 });
+    const s = toMin(v.start), ls = toMin(v.ls), le = toMin(v.le), end = toMin(v.end);
+    const warn = [];
+    const segs = [['上午', s, ls]];
+    let cur = le, k = 1;
+    [['b1s', 'b1e', 1], ['b2s', 'b2e', 2]].forEach(([a, b, n]) => {
+      const x = toMin(v[a]), y = toMin(v[b]);
+      if ((x == null) !== (y == null)) { warn.push(`中途離開 ${n} 要同時填離開和回來時間`); return; }
+      if (x == null) return;
+      if (!(x > cur)) warn.push(`中途離開 ${n} 的時間要晚於${k === 1 ? '午休結束' : '前一次回來'}`);
+      if (!(y > x)) warn.push(`回來 ${n} 的時間要晚於離開 ${n}`);
+      segs.push([`下午第 ${k} 段`, cur, x]); cur = y; k++;
+    });
+    segs.push([k === 1 ? '下午' : `下午第 ${k} 段`, cur, end]);
+    if (!(end > cur)) warn.push(`下午下班時間要晚於${k === 1 ? '午休結束' : '最後一次回來'}`);
+    if (!(ls > s)) warn.push('午休開始要晚於上班時間');
+    const e = end;
     const ot = toMin(v.ot) ?? e;
     const lens = segs.map(([n, a, b]) => [n, Math.max(0, b - a)]);
     const normal = lens.reduce((t, x) => t + x[1], 0);
     const gaps = segs.slice(1).map((x, i) => [segs[i][2], x[1]]).filter(([a, b]) => b > a);
-    const am = lens[0][1], pm = lens[1][1], lunch = Math.max(0, le - ls);
+    const am = lens[0][1], pm = lens.slice(1).reduce((t, x) => t + x[1], 0), lunch = Math.max(0, le - ls);
     if (normal > 480) warn.push(`正常工時 ${dur(normal)}，超過每日 8 小時（§30），超出的 ${normal - 480} 分鐘每天自動按平日加班計`);
     lens.filter(x => x[1] > 240).forEach(([n, m]) => warn.push(`${n}連續工作 ${dur(m)}，超過 4 小時須至少休息 30 分鐘（§35）`));
     if (ot > e) warn.push(`${fmtMin(e)} 下班到 ${v.ot} 加班起算之間須讓員工實際休息，期間若在工作仍應計加班`);
-    if (ot < e) warn.push('加班起算時間早於最後一段下班時間');
+    if (ot < e) warn.push('加班起算時間早於下午下班時間');
     if (lunch < 30 && am + pm > 240) warn.push('午休少於 30 分鐘（§35）');
     return { s, ls, le, e, ot, normal, am, pm, lunch, segs, gaps, warn };
   };
@@ -356,7 +384,7 @@ const PAYCALC = (() => {
     let v = list[0]; for (const x of list) if (x.from <= date) v = x;
     return v;
   };
-  const schedLabel = v => [`${v.start}–${v.ls}`, `${v.le}–${v.end}`, ...(v.p2s && v.p2e ? [`${v.p2s}–${v.p2e}`] : []), ...(v.p3s && v.p3e ? [`${v.p3s}–${v.p3e}`] : [])].join('、');
+  const schedLabel = v => schedInfo(v).segs.map(([, a, b]) => `${fmtMin(a)}–${fmtMin(b)}`).join('、');
 
   /* 舊資料（start/end/brk/ot）轉成班表版本 */
   function migrateEmp(emp) {
@@ -369,6 +397,7 @@ const PAYCALC = (() => {
       emp.scheds = [{ from: '2000-01-01', start, ls: '12:00', le: fmtMin(720 + brk), end, ot: end }];
     }
     emp.schedMode = emp.schedMode || 'company';
+    (emp.scheds || []).forEach(normSched);
     if (!emp.mealMode) emp.mealMode = emp.meal === false ? 'none' : 'daily';
     // 固定項目一律有「專業加給」，接在底薪（或月薪）後面
     emp.items = Array.isArray(emp.items) ? emp.items : [];
@@ -631,7 +660,7 @@ const PAYCALC = (() => {
     return { name, month, salary, days, typicalIn: mode(Object.values(days).map(x => x.in).filter(Boolean)), typicalOut: mode(Object.values(days).map(x => x.out).filter(Boolean)) };
   }
 
-  return { seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
+  return { normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
 })();
 if (typeof module !== 'undefined') module.exports = PAYCALC;
 
@@ -978,22 +1007,22 @@ function schedEditor(list, scope) {
   const cur = P.schedFor(scope === 'emp' ? st.emps[st.sel] : null, todayStr(), st.settings);
   const ext = scope === 'emp';
   return `<div class="sched ${ext ? 'ext' : ''}">
-    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span><span>${ext ? '下午下班' : '下班'}</span>${ext ? '<span>第 2 段開始</span><span>第 2 段結束</span><span>第 3 段開始</span><span>第 3 段結束</span>' : ''}<span>加班起算</span><span>每日正常工時</span><span></span></div>
+    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span>${ext ? '<span>中途離開 1</span><span>回來 1</span><span>中途離開 2</span><span>回來 2</span>' : ''}<span>${ext ? '下午下班' : '下班'}</span><span>加班起算</span><span>每日正常工時</span><span></span></div>
     ${sorted.map(({ v, i }) => {
-      const si = P.schedInfo(v);
+      P.normSched(v); const si = P.schedInfo(v);
       const inp = (k, w) => k === 'from'
         ? `<input class="fi num" type="text" inputmode="numeric" value="${v.from <= '2000-01-01' ? '' : esc(v.from.replace(/-/g, '/'))}" placeholder="${v.from <= '2000-01-01' ? '最早（不限）' : '2026/12/01'}" data-f="sv" data-scope="${scope}" data-i="${i}" data-k="from" aria-label="生效日，例如 2026/12/01 或 115/12/1">`
         : `<input class="fi num ${w || ''}" type="text" inputmode="numeric" value="${esc(v[k] || '')}" ${w === 'opt' ? 'placeholder="—"' : ''} data-f="sv" data-scope="${scope}" data-i="${i}" data-k="${k}" aria-label="${k}">`;
       const isCur = scope === 'emp' ? JSON.stringify(cur) === JSON.stringify(v) && st.emps[st.sel].schedMode === 'custom' : JSON.stringify(P.schedFor(null, todayStr(), st.settings)) === JSON.stringify(v);
       return `<div class="sv-row ${isCur ? 'cur' : ''}">
-        ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${inp('end')}${ext ? inp('p2s', 'opt') + inp('p2e', 'opt') + inp('p3s', 'opt') + inp('p3e', 'opt') : ''}${inp('ot')}
+        ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${ext ? inp('b1s', 'opt') + inp('b1e', 'opt') + inp('b2s', 'opt') + inp('b2e', 'opt') : ''}${inp('end')}${inp('ot')}
         <span class="num ${si.normal > 480 ? 'badtxt' : ''}">${P.dur(si.normal)}${isCur ? ' <em>目前</em>' : ''}</span>
         ${list.length > 1 ? `<button type="button" class="btn ghost small" data-act="delsv" data-scope="${scope}" data-i="${i}" aria-label="刪除這個班表">✕</button>` : '<span></span>'}
         ${si.warn.length ? `<ul class="sv-warn">${si.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
       </div>`;
     }).join('')}
     <button type="button" class="btn small" data-act="addsv" data-scope="${scope}">＋新增班表（設定新的生效日）</button>
-    ${ext ? '<p class="hint">在家工作中途需要離開的，可填下午第 2、3 段的開始與結束；兩段之間不計薪。不需要就留空。加班從最後一段結束後起算。</p>' : ''}
+    ${ext ? '<p class="hint">在家工作下午中途需要離開的，填「中途離開」和「回來」的時間，離開期間不計薪，最多兩次；不需要就留空。例：午休結束 13:30、離開 16:30、回來 17:30、下午下班 18:30。加班從下午下班後起算。</p>' : ''}
   </div>`;
 }
 /* 生效日：接受 2026/12/1、2026-12-01、20261201、民國 115/12/1；空白＝最早 */
@@ -1209,12 +1238,12 @@ document.addEventListener('change', e => {
     if (k === 'from') { const d = parseDate(val); if (!d) { toast('生效日請填 2026/12/01 或民國 115/12/1'); render(); return; } v.from = d; }
     else {
       const t = normTime(val);
-      if (t === '' && /^p[23][se]$/.test(k)) delete v[k];
+      if (t === '' && /^b[12][se]$/.test(k)) delete v[k];
       else if (!t) { toast('時間格式請用 08:00'); render(); return; }
       else v[k] = t;
       if (k !== 'ot') { const e2 = P.schedInfo(v).e; if (P.toMin(v.ot) < e2) v.ot = P.fmtMin(e2); }
     }
-    const si = P.schedInfo(v); const bad = si.warn.find(w => w.includes('要晚於')); if (bad) toast(bad);
+    const si = P.schedInfo(v); const bad = si.warn.find(w => w.includes('要晚於') || w.includes('要同時填')); if (bad) toast(bad);
     save(isCo ? 'config/main' : 'employees/' + emp.id);
   } else if (f === 'item') {
     const emp = st.emps[st.sel]; const it = emp.items[+el.dataset.i]; const k = el.dataset.k;
