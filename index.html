@@ -207,7 +207,8 @@ textarea.fi.small-ta{min-height:150px}
 .sv-h,.sv-row{display:grid;grid-template-columns:130px repeat(5,78px) 110px 28px;gap:6px;align-items:center;min-width:760px}
 .sched.ext .sv-h,.sched.ext .sv-row{grid-template-columns:118px repeat(9,68px) 96px 28px;min-width:950px}
 .sched .fi.opt{border-style:dashed}
-.sched .sv-h span{white-space:nowrap}
+.sched .sv-h span{white-space:nowrap;line-height:1.25}
+.sv-segs{grid-column:1/-1;font-size:12.5px;color:var(--muted);padding:2px 2px 0}
 .sv-h{font-size:11.5px;color:var(--muted)}
 .sv-row{padding:6px;border:1px solid var(--line);border-radius:var(--r)}
 .sv-row.cur{border-color:var(--accent)}
@@ -356,14 +357,14 @@ const PAYCALC = (() => {
     let cur = le, k = 1;
     [['b1s', 'b1e', 1], ['b2s', 'b2e', 2]].forEach(([a, b, n]) => {
       const x = toMin(v[a]), y = toMin(v[b]);
-      if ((x == null) !== (y == null)) { warn.push(`中途離開 ${n} 要同時填離開和回來時間`); return; }
+      if ((x == null) !== (y == null)) { warn.push(`外出 ${n} 要同時填外出和外出回來時間`); return; }
       if (x == null) return;
-      if (!(x > cur)) warn.push(`中途離開 ${n} 的時間要晚於${k === 1 ? '午休結束' : '前一次回來'}`);
-      if (!(y > x)) warn.push(`回來 ${n} 的時間要晚於離開 ${n}`);
+      if (!(x > cur)) warn.push(`外出 ${n} 的時間要晚於${k === 1 ? '午休結束' : '前一次外出回來'}`);
+      if (!(y > x)) warn.push(`外出回來 ${n} 的時間要晚於外出 ${n}`);
       segs.push([`下午第 ${k} 段`, cur, x]); cur = y; k++;
     });
     segs.push([k === 1 ? '下午' : `下午第 ${k} 段`, cur, end]);
-    if (!(end > cur)) warn.push(`下午下班時間要晚於${k === 1 ? '午休結束' : '最後一次回來'}`);
+    if (!(end > cur)) warn.push(`下班時間要晚於${k === 1 ? '午休結束' : '最後一次外出回來'}`);
     if (!(ls > s)) warn.push('午休開始要晚於上班時間');
     const e = end;
     const ot = toMin(v.ot) ?? e;
@@ -374,7 +375,7 @@ const PAYCALC = (() => {
     if (normal > 480) warn.push(`正常工時 ${dur(normal)}，超過每日 8 小時（§30），超出的 ${normal - 480} 分鐘每天自動按平日加班計`);
     lens.filter(x => x[1] > 240).forEach(([n, m]) => warn.push(`${n}連續工作 ${dur(m)}，超過 4 小時須至少休息 30 分鐘（§35）`));
     if (ot > e) warn.push(`${fmtMin(e)} 下班到 ${v.ot} 加班起算之間須讓員工實際休息，期間若在工作仍應計加班`);
-    if (ot < e) warn.push('加班起算時間早於下午下班時間');
+    if (ot < e) warn.push('加班起算時間早於下班時間');
     if (lunch < 30 && am + pm > 240) warn.push('午休少於 30 分鐘（§35）');
     return { s, ls, le, e, ot, normal, am, pm, lunch, segs, gaps, warn };
   };
@@ -1009,7 +1010,7 @@ function schedEditor(list, scope) {
   const cur = P.schedFor(scope === 'emp' ? st.emps[st.sel] : null, todayStr(), st.settings);
   const ext = scope === 'emp';
   return `<div class="sched ${ext ? 'ext' : ''}">
-    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>午休結束</span>${ext ? '<span>中途離開 1</span><span>回來 1</span><span>中途離開 2</span><span>回來 2</span>' : ''}<span>${ext ? '下午下班' : '下班'}</span><span>加班起算</span><span>每日正常工時</span><span></span></div>
+    <div class="sv-h"><span>生效日</span><span>上班</span><span>午休開始</span><span>${ext ? '午休結束<br>回來工作' : '午休結束'}</span>${ext ? '<span>外出 1</span><span>外出回來 1</span><span>外出 2</span><span>外出回來 2</span>' : ''}<span>下班</span><span>加班起算</span><span>每日正常工時</span><span></span></div>
     ${sorted.map(({ v, i }) => {
       P.normSched(v); const si = P.schedInfo(v);
       const inp = (k, w) => k === 'from'
@@ -1020,11 +1021,12 @@ function schedEditor(list, scope) {
         ${inp('from')}${inp('start')}${inp('ls')}${inp('le')}${ext ? inp('b1s', 'opt') + inp('b1e', 'opt') + inp('b2s', 'opt') + inp('b2e', 'opt') : ''}${inp('end')}${inp('ot')}
         <span class="num ${si.normal > 480 ? 'badtxt' : ''}">${P.dur(si.normal)}${isCur ? ' <em>目前</em>' : ''}</span>
         ${list.length > 1 ? `<button type="button" class="btn ghost small" data-act="delsv" data-scope="${scope}" data-i="${i}" aria-label="刪除這個班表">✕</button>` : '<span></span>'}
+        ${ext ? `<div class="sv-segs">工作時段：${esc(P.schedLabel(v))}（共 ${P.dur(si.normal)}）・${esc(v.ot)} 以後算加班</div>` : ''}
         ${si.warn.length ? `<ul class="sv-warn">${si.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
       </div>`;
     }).join('')}
     <button type="button" class="btn small" data-act="addsv" data-scope="${scope}">＋新增班表（設定新的生效日）</button>
-    ${ext ? '<p class="hint">在家工作下午中途需要離開的，填「中途離開」和「回來」的時間，離開期間不計薪，最多兩次；不需要就留空。例：午休結束 13:30、離開 16:30、回來 17:30、下午下班 18:30。加班從下午下班後起算。</p>' : ''}
+    ${ext ? '<p class="hint">下午需要外出的，填「外出」和「外出回來」的時間，外出期間不計薪，最多兩次；不需要就留空。例：上班 09:00、午休 12:00–13:30、外出 17:30、外出回來 18:30、下班 19:30，工作時段 09:00–12:00、13:30–17:30、18:30–19:30，每天 8 小時，19:30 以後算加班。</p>' : ''}
   </div>`;
 }
 /* 生效日：接受 2026/12/1、2026-12-01、20261201、民國 115/12/1；空白＝最早 */
