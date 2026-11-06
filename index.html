@@ -250,6 +250,29 @@ textarea.fi.small-ta{min-height:150px}
 .helper.lvinfo{gap:6px 18px}
 .helper.lvinfo b{color:var(--ink);font-weight:500}
 .helper .settle{color:var(--warn);background:var(--warn-soft);padding:2px 8px;border-radius:4px}
+.ptag{font-style:normal;font-size:10.5px;color:var(--warn);background:var(--warn-soft);border-radius:999px;padding:0 6px;margin-left:6px;font-weight:400;vertical-align:1px}
+.ptchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center}
+.ptchip{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:5px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;line-height:1.3;font-size:13px}
+.ptchip small{color:var(--muted);font-size:11.5px}
+.ptchip[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.ptchip:hover{border-color:var(--ink)}
+.pth{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 6px;font-size:13.5px;color:var(--ink);font-weight:700;max-width:1000px}
+.pth b{font-weight:500;color:var(--accent);font-size:13.5px}
+table.pt{border-collapse:collapse;width:100%;min-width:700px;max-width:1000px;font-size:13px;table-layout:fixed;margin-bottom:6px}
+table.pt th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:5px 3px;border-bottom:1px solid var(--line)}
+table.pt td{padding:2px 3px;border-bottom:1px solid var(--line)}
+table.pt .fi{padding:4px 6px;border-color:transparent;background:transparent}
+table.pt .fi:hover{border-color:var(--line)}table.pt .fi:focus{border-color:var(--accent);background:var(--surface)}
+table.pt th:nth-child(1){width:30px}table.pt th:nth-child(2){width:96px}table.pt th:nth-child(4){width:56px}table.pt th:nth-child(5){width:84px}table.pt th:nth-child(6){width:24%}table.pt th:last-child{width:30px}
+table.pt-r th:nth-child(4){width:30%}table.pt-r th:nth-child(5){width:84px}
+table.pt-i th:nth-child(3){width:130px}table.pt-i th:nth-child(4){width:96px}table.pt-i th:nth-child(5){width:84px}table.pt-i th:nth-child(6){width:auto}
+.ptsum .sysv{font-size:11.5px;color:var(--muted);margin-left:auto}
+.ptsum label{position:relative}
+.ptpay{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:14px}
+.ptpay b{font-size:20px;color:var(--accent);font-weight:500;margin:0 4px}
+.flags.info{margin:10px 0 0}
+.flags.info li{background:var(--accent-soft);color:var(--accent);font-size:12.5px;padding:4px 10px}
+table.sum tr.sel td{background:var(--accent-soft)}
 @media (prefers-reduced-motion:no-preference){.who,.btn{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -408,7 +431,7 @@ const PAYCALC = (() => {
 
   /* 舊資料（start/end/brk/ot）轉成班表版本 */
   function migrateEmp(emp) {
-    if (!emp) return emp;
+    if (!emp || emp.type === 'contractor') return emp;
     if (!emp.scheds) {
       const o = emp.sched || {};
       const start = o.start || '08:00', end = o.end || '17:30', brk = +o.brk || 90;
@@ -687,6 +710,175 @@ const PAYCALC = (() => {
 })();
 if (typeof module !== 'undefined') module.exports = PAYCALC;
 
+/* 外包 PT：請款期解析與計算（純函式） */
+const PTCALC = (() => {
+  const pad = n => String(n).padStart(2, '0');
+  const fw = s => String(s ?? '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 65248)).replace(/[－～]/g, m => m === '－' ? '-' : '~').replace(/．/g, '.');
+  const num = v => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[,，\s]/g, '')); return isNaN(n) ? null : n; };
+  const ymd = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
+  const valid = (y, m, d) => { const t = new Date(y, m - 1, d); return t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d; };
+  /* 日期：Excel 序號、2025-03-28、2025/4/22~4/25、114/5/15轉帳、1100523（民國 yyyMMdd） */
+  function parseDate(v) {
+    if (v == null || v === '') return null;
+    if (v instanceof Date) return ymd(v.getFullYear(), v.getMonth() + 1, v.getDate());
+    if (typeof v === 'number') {
+      if (v > 20000 && v < 80000) { const t = new Date(Math.round((v - 25569) * 86400000)); return ymd(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate()); }
+      const s = String(Math.round(v));
+      if (/^\d{7}$/.test(s)) { const y = +s.slice(0, 3) + 1911, m = +s.slice(3, 5), d = +s.slice(5); return valid(y, m, d) ? ymd(y, m, d) : null; }
+      if (/^\d{8}$/.test(s)) { const y = +s.slice(0, 4), m = +s.slice(4, 6), d = +s.slice(6); return valid(y, m, d) ? ymd(y, m, d) : null; }
+      return null;
+    }
+    const t = fw(v).trim();
+    let m = /^(\d{2,4})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/.exec(t);
+    if (m) { let y = +m[1]; if (y < 1911) y += 1911; return valid(y, +m[2], +m[3]) ? ymd(y, +m[2], +m[3]) : null; }
+    m = /^(\d{7})$/.exec(t); if (m) return parseDate(+m[1]);
+    return null;
+  }
+  /* 工作表名稱的期間：2021-3~4月、2021-12~2022-1月、2024-11~2025-4.7、20250515、2025-8~2026-5 */
+  function parseRange(name) {
+    const t = fw(name).replace(/\s/g, '');
+    let m = /^(\d{4})(\d{2})(\d{2})$/.exec(t);
+    if (m) return { start: ymd(+m[1], +m[2], +m[3]), end: ymd(+m[1], +m[2], +m[3]) };
+    m = /^(\d{4})-(\d{1,2})~(?:(\d{4})-)?(\d{1,2})(?:\.(\d{1,2}))?/.exec(t);
+    if (!m) return null;
+    const y1 = +m[1], m1 = +m[2], y2 = m[3] ? +m[3] : (+m[4] < m1 ? y1 + 1 : y1), m2 = +m[4];
+    const last = new Date(y2, m2, 0).getDate();
+    return { start: ymd(y1, m1, 1), end: ymd(y2, m2, m[5] ? Math.min(+m[5], last) : last) };
+  }
+  const shiftYear = (d, k) => `${+d.slice(0, 4) + k}${d.slice(4)}`;
+  const addMonths = (d, k) => { const [y, m] = d.split('-').map(Number); const t = new Date(y, m - 1 + k, 1); return ymd(t.getFullYear(), t.getMonth() + 1, 1); };
+
+  /* 一個工作表 → 一個請款期 */
+  function parseSheet(name, rows) {
+    const S = v => fw(v ?? '').trim();
+    const warn = [];
+    const hi = rows.findIndex(r => (r || []).some(c => S(c) === '施工日期') && (r || []).some(c => S(c) === '工資'));
+    if (hi < 0) return null;
+    const H = rows[hi].map(S);
+    const col = (...names) => { for (const n of names) { const i = H.indexOf(n); if (i >= 0) return i; } return -1; };
+    const C = { no: 0, date: col('施工日期'), hours: col('時數'), place: col('地點'), note: H.indexOf('備註'), wage: col('工資'), tax: col('稅金'), invDate: col('提供發票日期'), invNo: col('發票號碼'), invAmt: col('含稅發票金額', '發票金額'), invTax: col('發票稅金'), bal: col('稅金餘額') };
+    C.note2 = H.lastIndexOf('備註') > C.note ? H.lastIndexOf('備註') : -1;
+    const at = (r, i) => i >= 0 ? r[i] : null;
+    const range = parseRange(name);
+    const jobs = [], inv = [], reimb = [], fixes = [];
+    let opening = null, sub = null, wageLine = null, reimbLine = null, payLine = null;
+    let i = hi + 1;
+    for (; i < rows.length; i++) {
+      const r = rows[i] || []; const a = S(r[0]);
+      if (a === '小計') { sub = { wage: num(at(r, C.wage)), tax: num(at(r, C.tax)), invTax: num(at(r, C.invTax)), bal: num(at(r, C.bal)), hours: num(at(r, C.hours)) }; continue; }
+      if (a === '總計' && !wageLine && !reimb.length) { wageLine = num(at(r, C.wage)); continue; }
+      if (a === '代墊款') break;
+      if (a === '總金額') { payLine = num(at(r, C.wage)); continue; }
+      const dRaw = at(r, C.date), place = S(at(r, C.place)), note = S(at(r, C.note)), wage = num(at(r, C.wage));
+      const hasJob = dRaw != null && dRaw !== '' || place || wage != null;
+      const invNo = S(at(r, C.invNo)), invAmt = num(at(r, C.invAmt)), invTax = num(at(r, C.invTax)), invD = at(r, C.invDate);
+      if (!hasJob && !invNo && invAmt == null && invTax == null) { const b = num(at(r, C.bal)); if (b != null && opening == null) opening = b; continue; }
+      const date = parseDate(dRaw);
+      const n2 = S(at(r, C.note2));
+      if (hasJob && (place || wage != null || date)) {
+        let d = date;
+        if (d && range && (d > addMonths(range.end, 2) || d < addMonths(range.start, -3)) && shiftYear(d, -1) >= addMonths(range.start, -3) && shiftYear(d, -1) <= addMonths(range.end, 2)) { fixes.push([d, shiftYear(d, -1)]); d = shiftYear(d, -1); }
+        const text = typeof dRaw === 'string' && dRaw.trim() && (!date || /[~～]/.test(dRaw)) ? S(dRaw) : '';
+        jobs.push({ date: d || '', desc: [place, note].filter(Boolean).join(' '), hours: num(at(r, C.hours)), amount: wage, note: [text ? `日期 ${text}` : '', n2 && !(invNo || invAmt != null) ? n2 : ''].filter(Boolean).join('；') });
+      }
+      if (invNo || invAmt != null || invTax != null) inv.push({ date: parseDate(invD) || '', no: invNo, amount: invAmt, tax: invTax, note: n2 });
+    }
+    if (fixes.length) warn.push(`${fixes.length} 筆日期的年份與期間不符，已自動更正（${fixes[0][0]} → ${fixes[0][1]}${fixes.length > 1 ? ` … ${fixes[fixes.length - 1][0]} → ${fixes[fixes.length - 1][1]}` : ''}）`);
+    // 代墊款
+    if (i < rows.length) {
+      const rh = rows.findIndex((r, k) => k > i && (r || []).some(c => S(c) === '項目') && (r || []).some(c => /金額/.test(S(c))));
+      if (rh >= 0) {
+        const R = rows[rh].map(S);
+        const ia = R.findIndex(x => /金額/.test(x));
+        const idt = R.findIndex(x => x === '施工日期' || x === '時間');
+        let iit = R.findIndex((x, k) => k > 0 && (x === '地點' || x === '材料費' || x === '項目'));
+        const inote = R.indexOf('備註');
+        let lastDate = '';
+        for (let k = rh + 1; k < rows.length; k++) {
+          const r = rows[k] || []; const a = S(r[0]);
+          if (a === '總計') { reimbLine = num(r[ia]); continue; }
+          if (a === '總金額') { payLine = num(r[ia]); continue; }
+          const amt = num(r[ia]); const item = S(at(r, iit)); const dd = at(r, idt);
+          if (amt == null && !item) continue;
+          const d = parseDate(dd) || lastDate; if (parseDate(dd)) lastDate = d;
+          const dtext = typeof dd === 'string' && !parseDate(dd.slice(0, 10)) ? S(dd) : (typeof dd === 'string' && /[^\d\-\/]/.test(dd) ? S(dd) : '');
+          reimb.push({ date: d || '', item, note: [S(at(r, inote)), dtext].filter(Boolean).join('；'), amount: amt || 0 });
+        }
+      }
+    }
+    // 期間
+    const ds = jobs.map(j => j.date).concat(reimb.map(x => x.date)).filter(Boolean).sort();
+    const start = range ? range.start : (ds[0] || ''), end = range ? range.end : (ds[ds.length - 1] || start);
+    const undated = jobs.filter(j => !j.date).length + reimb.filter(x => !x.date).length;
+    if (undated) warn.push(`${undated} 筆沒有日期，統計時算在 ${end.slice(0, 7)}`);
+    // 金額
+    const perRow = jobs.reduce((t, j) => t + (j.amount || 0), 0);
+    const wageTotal = sub && sub.wage != null ? sub.wage : perRow;
+    const lump = Math.abs(wageTotal - perRow) > 0.5;
+    if (lump) warn.push(`原表工資為本期合計 ${wageTotal.toLocaleString()} 元（逐筆僅列 ${perRow.toLocaleString()} 元）`);
+    const invSum = inv.reduce((t, x) => t + (x.tax || 0), 0);
+    const tax = sub && sub.tax != null ? sub.tax : 0;
+    const invTax = sub && sub.invTax != null ? sub.invTax : invSum;
+    const reimbTotal = reimbLine != null ? reimbLine : reimb.reduce((t, x) => t + x.amount, 0);
+    const reimbSum = reimb.reduce((t, x) => t + x.amount, 0);
+    if (Math.abs(reimbSum - reimbTotal) > 0.5) warn.push(`代墊款逐筆加總 ${reimbSum} 與原表總計 ${reimbTotal} 不同，以原表為準`);
+    let taxAdded = false;
+    if (payLine != null && Math.abs(payLine - (wageTotal + tax + reimbTotal)) < 2 && tax) taxAdded = true;
+    else if (wageLine != null && tax && Math.abs(wageLine - (wageTotal + tax)) < 2) taxAdded = true;
+    const calcPay = wageTotal + (taxAdded ? tax : 0) + reimbTotal;
+    const payOverride = payLine != null && Math.abs(payLine - calcPay) > 0.5 ? payLine : null;
+    if (payOverride != null && Math.abs(payLine - calcPay) > 2) warn.push(`原表總金額 ${payLine.toLocaleString()} 元，與工資＋代墊 ${calcPay.toLocaleString()} 元不同，以原表為準`);
+    const batch = {
+      kind: 'ptbatch', title: fw(name).trim(), start, end, jobs, reimb, inv,
+      taxRate: 5, taxAdded,
+      wageOverride: lump ? wageTotal : null,
+      taxOverride: Math.abs(tax - Math.round(wageTotal * 5) / 100) > 0.5 ? tax : null,
+      invTaxOverride: Math.abs(invTax - invSum) > 0.5 ? invTax : null,
+      reimbOverride: Math.abs(reimbSum - reimbTotal) > 0.5 ? reimbTotal : null,
+      payOverride,
+      balOverride: sub && sub.bal != null ? sub.bal : null,
+      src: { opening, closing: sub ? sub.bal : null, payable: payLine },
+      warn
+    };
+    return batch;
+  }
+
+  /* 請款期計算 */
+  function batchCalc(b) {
+    const perRow = (b.jobs || []).reduce((t, j) => t + (+j.amount || 0), 0);
+    const wage = b.wageOverride != null && b.wageOverride !== '' ? +b.wageOverride : perRow;
+    const tax = b.taxOverride != null && b.taxOverride !== '' ? +b.taxOverride : Math.round(wage * (+b.taxRate || 0)) / 100;
+    const reimbSum = (b.reimb || []).reduce((t, x) => t + (+x.amount || 0), 0);
+    const reimb = b.reimbOverride != null && b.reimbOverride !== '' ? +b.reimbOverride : reimbSum;
+    const invSum = (b.inv || []).reduce((t, x) => t + (+x.tax || 0), 0);
+    const invTax = b.invTaxOverride != null && b.invTaxOverride !== '' ? +b.invTaxOverride : invSum;
+    const payable = b.payOverride != null && b.payOverride !== '' ? +b.payOverride : wage + (b.taxAdded ? tax : 0) + reimb;
+    const hours = (b.jobs || []).reduce((t, j) => t + (+j.hours || 0), 0);
+    return { perRow, wage, tax, reimb, reimbSum, invSum, invTax, payable, hours, count: (b.jobs || []).length };
+  }
+  /* 依期間排序後累計稅金餘額 */
+  function ledger(batches) {
+    const list = [...batches].sort((a, b) => (a.start || '').localeCompare(b.start || '') || (a.end || '').localeCompare(b.end || '') || (a.title || '').localeCompare(b.title || ''));
+    let bal = 0;
+    return list.map(b => { const c = batchCalc(b); const opening = bal; const calc = Math.round((bal + c.invTax - c.tax) * 100) / 100; bal = b.balOverride != null && b.balOverride !== '' ? +b.balOverride : calc; return { b, c, opening, closing: bal, calcClosing: calc }; });
+  }
+  /* 依日期統計（每月、每年）；整期合計的工資算在期末月份 */
+  function byMonth(batches) {
+    const m = {};
+    const add = (ym, k, v) => { (m[ym] = m[ym] || { wage: 0, reimb: 0, count: 0 })[k] += v; };
+    batches.forEach(b => {
+      const c = batchCalc(b), endM = (b.end || '').slice(0, 7);
+      if (b.wageOverride != null && b.wageOverride !== '') { add(endM, 'wage', c.wage); add(endM, 'count', (b.jobs || []).length); }
+      else (b.jobs || []).forEach(j => { const ym = (j.date || b.end || '').slice(0, 7); add(ym, 'wage', +j.amount || 0); add(ym, 'count', 1); });
+      if (b.reimbOverride != null && b.reimbOverride !== '') add(endM, 'reimb', c.reimb);
+      else (b.reimb || []).forEach(x => add((x.date || b.end || '').slice(0, 7), 'reimb', +x.amount || 0));
+    });
+    return m;
+  }
+  return { parseSheet, parseDate, parseRange, batchCalc, ledger, byMonth, fw };
+})();
+if (typeof module !== 'undefined') module.exports = PTCALC;
+
 </script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -876,17 +1068,21 @@ function leaveInfo(emp, month) {
 function roster(cur) {
   const list = empList();
   return `<aside class="roster">${list.map(e => {
+    if (isPT(e)) { const L = ptLedger(e); const last = L[L.length - 1];
+      return `<button type="button" class="who" data-act="sel" data-id="${e.id}" aria-current="${e.id === cur}"><span><span class="n">${esc(e.name)}<em class="ptag">外包</em></span><span class="t">${last ? esc(last.b.title) : '尚無請款紀錄'}</span></span><span class="v num">${last ? money(last.c.payable) : '—'}</span></button>`; }
     const r = calc(e, st.month);
     return `<button type="button" class="who" data-act="sel" data-id="${e.id}" aria-current="${e.id === cur}"><span><span class="n">${esc(e.name)}</span><span class="t">${esc(e.title || '')}${e.active === false ? '・已停用' : ''}</span></span><span class="v num">${getRec(e.id, st.month) ? money(r.net) : '—'}</span></button>`;
   }).join('')}
   <div class="side-actions">
     <button type="button" class="btn primary" data-act="import">匯入打卡表</button>
     <button type="button" class="btn" data-act="addemp">新增員工</button>
+    <button type="button" class="btn" data-act="addpt">新增外包 PT</button>
   </div></aside>`;
 }
 
 function viewPay() {
   const emp = st.emps[st.sel];
+  if (isPT(emp)) return viewPT(emp);
   if (!emp) return `<div class="layout">${roster(null)}<div><section class="panel"><div class="empty"><h2>還沒有員工資料</h2><p>把每月的打卡 Excel 匯入，系統會依「姓名：」自動建立員工；或先新增員工再手動填寫打卡時間。</p><div class="drop" id="drop" style="margin-top:14px">把打卡表拖到這裡，或按左側「匯入打卡表」</div></div></section></div></div>`;
   const rec = getRec(emp.id, st.month);
   const r = calc(emp, st.month);
@@ -1009,7 +1205,7 @@ function adjList(side, title, list, quick) {
 }
 
 function viewSum() {
-  const list = empList().filter(e => e.active !== false || getRec(e.id, st.month));
+  const list = empList().filter(e => !isPT(e) && (e.active !== false || getRec(e.id, st.month)));
   if (!list.length) return `<section class="panel"><div class="empty"><h2>沒有員工</h2><p>先到「本月薪資」匯入打卡表。</p></div></section>`;
   const T = { g: 0, ot: 0, meal: 0, d: 0, n: 0, er: 0 };
   const rows = list.map(e => {
@@ -1021,7 +1217,10 @@ function viewSum() {
   return `<section class="panel"><div class="ph"><h2>${roc(st.month)}薪資總表</h2><div class="acts"><button type="button" class="btn primary small" data-act="xall">匯出全員 Excel</button><button type="button" class="btn small" data-act="xallpdf">匯出全員 PDF</button></div></div>
   <div class="tscroll"><table class="sum"><thead><tr><th>姓名</th><th>延長工時</th><th>加班費</th><th>餐費</th><th>應支</th><th>應扣</th><th>實發</th><th>雇主負擔</th><th></th></tr></thead><tbody>${rows}
   <tr class="tot"><td>合計</td><td></td><td class="num">${money(T.ot)}</td><td class="num">${money(T.meal)}</td><td class="num">${money(T.g)}</td><td class="num">${money(T.d)}</td><td class="num net">${money(T.n)}</td><td class="num">${money(T.er)}</td><td></td></tr></tbody></table></div>
-  <p class="hint" style="margin-top:10px">雇主負擔＝勞保 ${st.settings.laborEr}%、健保 ${st.settings.healthEr}%（含平均眷口 ${st.settings.healthAvgDep}）、勞退 ${st.settings.pensionEr}%；職業災害保險費依公司費率另計。</p></section>`;
+  <p class="hint" style="margin-top:10px">雇主負擔＝勞保 ${st.settings.laborEr}%、健保 ${st.settings.healthEr}%（含平均眷口 ${st.settings.healthAvgDep}）、勞退 ${st.settings.pensionEr}%；職業災害保險費依公司費率另計。</p></section>${(() => { const R = ptMonthRows(st.month); if (!R.length) return '';
+    return `<section class="panel"><div class="ph"><h2>外包 PT・${roc(st.month)}工作</h2><span class="hint">依工作日期統計；請款以請款期為準</span></div>
+    <div class="tscroll"><table class="sum"><thead><tr><th>姓名</th><th>工作筆數</th><th>工資</th><th>代墊款</th><th>合計</th><th style="text-align:left">工作內容</th></tr></thead><tbody>
+    ${R.map(x => `<tr><td><button type="button" class="btn ghost small" style="color:var(--ink);padding-left:0" data-act="open" data-id="${x.e.id}">${esc(x.e.name)}</button></td><td class="num">${x.items.length}</td><td class="num">${money(x.wage)}</td><td class="num">${money(x.reimb)}</td><td class="num net">${money(x.wage + x.reimb)}</td><td style="text-align:left;white-space:normal;min-width:220px">${esc(x.items.join('、'))}</td></tr>`).join('')}</tbody></table></div></section>`; })()}`;
 }
 
 /* 班表版本編輯器（公司與個人共用） */
@@ -1063,6 +1262,7 @@ const todayStr = () => { const t = new Date(); return `${t.getFullYear()}-${Stri
 
 function viewEmp() {
   const emp = st.emps[st.sel];
+  if (isPT(emp)) return viewPTEmp(emp);
   const body = !emp ? `<section class="panel"><div class="empty"><h2>沒有選取員工</h2></div></section>` : (() => {
     const r = calc(emp, st.month);
     const f = (k, label, type = 'text', extra = '') => `<label>${label}<input class="fi ${type === 'number' ? 'num' : ''}" type="${type}" value="${esc(emp[k] ?? '')}" data-f="emp" data-k="${k}" ${extra}></label>`;
@@ -1162,6 +1362,181 @@ function viewSet() {
   <section class="panel"><div class="ph"><h2>國定假日與補假日</h2><span class="hint">一行一天：日期 名稱。落在週六日的節日請填實際補假日。</span></div>
   <textarea class="fi" data-f="hol" aria-label="國定假日清單">${esc((S.holidays || []).map(([d, n]) => `${d} ${n}`).join('\n'))}</textarea></section>`;
 }
+
+/* ---------- 外包 PT ---------- */
+const T = PTCALC;
+const isPT = e => e && e.type === 'contractor';
+const ptKey = (empId, b) => `${empId}__pt__${b.start || 'x'}_${b.end || 'x'}`;
+const ptBatches = emp => Object.entries(st.months).filter(([, v]) => v && v.kind === 'ptbatch' && v.emp === emp.id).map(([k, v]) => ({ key: k, b: v }));
+const ptLedger = emp => { const list = ptBatches(emp); const L = T.ledger(list.map(x => x.b)); return L.map(row => ({ ...row, key: list.find(x => x.b === row.b).key })); };
+const m2 = n => (n == null || n === '' ? '' : (Math.round(n * 100) / 100).toLocaleString('zh-TW', { maximumFractionDigits: 2 }));
+const newPT = () => ({ id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: 'contractor', name: '外包 PT', title: '外包 PT', order: 90, active: true, taxRate: 5 });
+
+function viewPT(emp) {
+  const L = ptLedger(emp);
+  if (!st.ptSel || !L.some(x => x.key === st.ptSel)) st.ptSel = L.length ? L[L.length - 1].key : null;
+  const cur = L.find(x => x.key === st.ptSel);
+  const totWage = L.reduce((t, x) => t + x.c.wage, 0), totPay = L.reduce((t, x) => t + x.c.payable, 0);
+  const bal = L.length ? L[L.length - 1].closing : 0;
+  const head = `<div class="emp-head"><div><h2>${esc(emp.name)}</h2><div class="meta">外包 PT・不適用勞基法工資計算，以請款期記錄工資、代墊款與發票抵稅・共 ${L.length} 期</div></div>
+    <div class="kpis"><div class="kpi"><span>累計工資</span><b class="num">${money(totWage)}</b></div><div class="kpi"><span>累計應付</span><b class="num">${money(totPay)}</b></div>
+    ${cur ? `<div class="kpi"><span>本期工資</span><b class="num">${m2(cur.c.wage)}</b></div><div class="kpi net"><span>本期應付</span><b class="num">${m2(cur.c.payable)}</b></div>` : ''}<div class="kpi"><span>稅金餘額</span><b class="num">${m2(bal)}</b></div></div></div>`;
+  const chips = `<div class="ptchips">${[...L].reverse().map(x => `<button type="button" class="ptchip" data-act="ptsel" data-key="${esc(x.key)}" aria-current="${x.key === st.ptSel}">${esc(x.b.title || `${x.b.start}～${x.b.end}`)}<small class="num">${money(x.c.payable)}</small></button>`).join('')}
+    <button type="button" class="btn small" data-act="ptadd">＋新增請款期</button></div>`;
+  const body = cur ? ptBatchPanel(emp, cur) : `<section class="panel"><div class="empty"><h2>還沒有請款紀錄</h2><p>按「匯入打卡表」選外包的工資紀錄 Excel，或按「＋新增請款期」開始記錄。</p></div></section>`;
+  return `<div class="layout">${roster(emp.id)}<div style="min-width:0">${head}${chips}${body}${ptHistory(emp, L)}</div></div>`;
+}
+
+function ptBatchPanel(emp, row) {
+  const { b, c, key, opening, closing, calcClosing } = row;
+  const K = esc(key);
+  const inp = (sec, i, k, v, cls = '', ph = '') => `<input class="fi ${cls}" type="text" value="${esc(v ?? '')}" ${ph ? `placeholder="${esc(ph)}"` : ''} data-f="pt" data-key="${K}" data-sec="${sec}" data-i="${i}" data-k="${k}">`;
+  const del = (sec, i) => `<button type="button" class="btn ghost small" data-act="ptdelrow" data-key="${K}" data-sec="${sec}" data-i="${i}" aria-label="刪除">✕</button>`;
+  const dshow = d => d ? d.replace(/-/g, '/') : '';
+  const jobs = (b.jobs || []).map((j, i) => `<tr><td>${i + 1}</td><td>${inp('jobs', i, 'date', dshow(j.date), 'num', '日期')}</td><td>${inp('jobs', i, 'desc', j.desc)}</td><td>${inp('jobs', i, 'hours', j.hours, 'num')}</td><td>${inp('jobs', i, 'amount', j.amount, 'num')}</td><td>${inp('jobs', i, 'note', j.note)}</td><td>${del('jobs', i)}</td></tr>`).join('');
+  const reimb = (b.reimb || []).map((x, i) => `<tr><td>${i + 1}</td><td>${inp('reimb', i, 'date', dshow(x.date), 'num', '日期')}</td><td>${inp('reimb', i, 'item', x.item)}</td><td>${inp('reimb', i, 'note', x.note)}</td><td>${inp('reimb', i, 'amount', x.amount, 'num')}</td><td>${del('reimb', i)}</td></tr>`).join('');
+  const inv = (b.inv || []).map((x, i) => `<tr><td>${i + 1}</td><td>${inp('inv', i, 'date', dshow(x.date), 'num', '日期')}</td><td>${inp('inv', i, 'no', x.no)}</td><td>${inp('inv', i, 'amount', x.amount, 'num')}</td><td>${inp('inv', i, 'tax', x.tax, 'num')}</td><td>${inp('inv', i, 'note', x.note)}</td><td>${del('inv', i)}</td></tr>`).join('');
+  const ov = (k, label, sys, val, hint = '') => `<label>${label}<span class="sysv">系統：${m2(sys)}</span>${inp('top', 0, k, val, 'num', '空白＝用系統金額')}${hint ? `<span class="hint">${hint}</span>` : ''}</label>`;
+  return `<section class="panel"><div class="ph"><h2>請款期明細</h2>
+      <div class="acts"><button type="button" class="btn small" data-act="ptx" data-key="${K}">匯出本期 Excel</button><button type="button" class="btn small ${st.del === key ? 'danger' : ''}" data-act="ptdelb" data-key="${K}">${st.del === key ? '再按一次確認刪除本期' : '刪除本期'}</button></div></div>
+    <div class="form"><label>期間名稱${inp('top', 0, 'title', b.title)}</label><label>起日${inp('top', 0, 'start', dshow(b.start), 'num')}</label><label>迄日${inp('top', 0, 'end', dshow(b.end), 'num')}</label>
+      <label>稅率 %${inp('top', 0, 'taxRate', b.taxRate, 'num')}</label>
+      <label class="chk"><input type="checkbox" ${b.taxAdded ? 'checked' : ''} data-f="pt" data-key="${K}" data-sec="top" data-i="0" data-k="taxAdded">稅金加在應付金額裡</label></div>
+    ${(b.warn || []).length ? `<ul class="flags info">${b.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+    <h3 class="pth">工作紀錄<b class="num">${m2(c.perRow)}</b></h3>
+    <div class="tscroll"><table class="pt"><thead><tr><th>#</th><th>日期</th><th>內容／地點</th><th>時數</th><th>工資</th><th>備註</th><th></th></tr></thead><tbody>${jobs}</tbody></table></div>
+    <button type="button" class="btn small" data-act="ptrow" data-key="${K}" data-sec="jobs">＋新增工作</button>
+    <h3 class="pth">代墊款<b class="num">${m2(c.reimbSum)}</b></h3>
+    <div class="tscroll"><table class="pt pt-r"><thead><tr><th>#</th><th>日期</th><th>項目</th><th>備註</th><th>金額</th><th></th></tr></thead><tbody>${reimb}</tbody></table></div>
+    <button type="button" class="btn small" data-act="ptrow" data-key="${K}" data-sec="reimb">＋新增代墊款</button>
+    <h3 class="pth">提供的發票（抵稅）<b class="num">稅金 ${m2(c.invSum)}</b></h3>
+    <div class="tscroll"><table class="pt pt-i"><thead><tr><th>#</th><th>提供日期</th><th>發票號碼</th><th>含稅金額</th><th>發票稅金</th><th>備註</th><th></th></tr></thead><tbody>${inv}</tbody></table></div>
+    <button type="button" class="btn small" data-act="ptrow" data-key="${K}" data-sec="inv">＋新增發票</button>
+    <h3 class="pth">本期結算</h3>
+    <div class="form ptsum">
+      ${ov('wageOverride', '工資小計', c.perRow, b.wageOverride, '逐筆工資加總；原表只有整期合計時填這裡')}
+      ${ov('taxOverride', `稅金（${b.taxRate || 0}%）`, Math.round(c.wage * (+b.taxRate || 0)) / 100, b.taxOverride)}
+      ${ov('reimbOverride', '代墊款合計', c.reimbSum, b.reimbOverride)}
+      ${ov('payOverride', '應付總額', c.wage + (b.taxAdded ? c.tax : 0) + c.reimb, b.payOverride, b.taxAdded ? '工資＋稅金＋代墊款' : '工資＋代墊款')}
+      ${ov('invTaxOverride', '發票稅金', c.invSum, b.invTaxOverride)}
+      ${ov('balOverride', '期末稅金餘額', calcClosing, b.balOverride, `期初 ${m2(opening)} ＋ 發票稅金 ${m2(c.invTax)} － 稅金 ${m2(c.tax)}`)}
+    </div>
+    <div class="ptpay">本期應付 <b class="num">${m2(c.payable)}</b> 元・稅金餘額 <b class="num">${m2(closing)}</b></div>
+  </section>`;
+}
+
+function ptHistory(emp, L) {
+  if (!L.length) return '';
+  const M = T.byMonth(L.map(x => x.b)); const Y = {};
+  Object.entries(M).forEach(([ym, v]) => { const y = ym.slice(0, 4); const o = Y[y] = Y[y] || { wage: 0, reimb: 0, count: 0 }; o.wage += v.wage; o.reimb += v.reimb; o.count += v.count; });
+  const rows = [...L].reverse().map(x => `<tr class="${x.key === st.ptSel ? 'sel' : ''}"><td><button type="button" class="btn ghost small" style="color:var(--ink);padding-left:0" data-act="ptsel" data-key="${esc(x.key)}">${esc(x.b.title)}</button></td><td class="num">${x.c.count}</td><td class="num">${m2(x.c.wage)}</td><td class="num">${m2(x.c.tax)}</td><td class="num">${m2(x.c.reimb)}</td><td class="num net">${m2(x.c.payable)}</td><td class="num">${m2(x.c.invTax)}</td><td class="num">${m2(x.closing)}</td></tr>`).join('');
+  const ys = Object.keys(Y).sort().reverse().map(y => `<tr><td>${y} 年（民國 ${+y - 1911}）</td><td class="num">${Y[y].count}</td><td class="num">${money(Y[y].wage)}</td><td class="num">${money(Y[y].reimb)}</td><td class="num net">${money(Y[y].wage + Y[y].reimb)}</td></tr>`).join('');
+  const tw = L.reduce((t, x) => t + x.c.wage, 0), tr = L.reduce((t, x) => t + x.c.reimb, 0), tp = L.reduce((t, x) => t + x.c.payable, 0), tt = L.reduce((t, x) => t + x.c.tax, 0);
+  return `<section class="panel"><div class="ph"><h2>歷年統計</h2><div class="acts"><button type="button" class="btn small primary" data-act="ptxall">匯出全部紀錄 Excel</button></div></div>
+    <h3 class="pth">各請款期</h3>
+    <div class="tscroll"><table class="sum"><thead><tr><th>期間</th><th>筆數</th><th>工資</th><th>稅金</th><th>代墊款</th><th>應付總額</th><th>發票稅金</th><th>稅金餘額</th></tr></thead><tbody>${rows}
+    <tr class="tot"><td>合計</td><td></td><td class="num">${m2(tw)}</td><td class="num">${m2(tt)}</td><td class="num">${m2(tr)}</td><td class="num net">${m2(tp)}</td><td></td><td></td></tr></tbody></table></div>
+    <h3 class="pth" style="margin-top:16px">依年度（依工作日期；沒有日期或整期合計的，算在該期最後一個月）</h3>
+    <div class="tscroll"><table class="sum"><thead><tr><th>年度</th><th>工作筆數</th><th>工資</th><th>代墊款</th><th>合計</th></tr></thead><tbody>${ys}</tbody></table></div></section>`;
+}
+
+function viewPTEmp(emp) {
+  const f = (k, label, type = 'text') => `<label>${label}<input class="fi ${type === 'number' ? 'num' : ''}" type="${type}" value="${esc(emp[k] ?? '')}" data-f="emp" data-k="${k}"></label>`;
+  return `<div class="layout">${roster(emp.id)}<div style="min-width:0"><section class="panel"><div class="ph"><h2>${esc(emp.name)}<small>外包 PT</small></h2>
+    <div class="acts"><button type="button" class="btn small ${st.del === emp.id ? 'danger' : ''}" data-act="delemp">${st.del === emp.id ? '再按一次確認刪除（含所有請款紀錄）' : '刪除'}</button></div></div>
+    <div class="form">${f('name', '姓名')}${f('title', '職稱')}${f('order', '排序', 'number')}${f('taxRate', '預設稅率 %', 'number')}
+      <label class="chk"><input type="checkbox" ${emp.active !== false ? 'checked' : ''} data-f="emp" data-k="active">合作中</label></div>
+    <p class="hint" style="margin-top:10px">外包 PT 不適用勞基法的加班、勞健保與特休計算。新增請款期時，稅金會依這裡的稅率預設。</p></section></div></div>`;
+}
+
+function ptMonthRows(month) {
+  return empList().filter(isPT).map(e => {
+    const items = []; let wage = 0, reimb = 0;
+    ptBatches(e).forEach(({ b }) => {
+      const endM = (b.end || '').slice(0, 7), lump = b.wageOverride != null && b.wageOverride !== '';
+      (b.jobs || []).forEach(j => { const ym = (j.date || b.end || '').slice(0, 7); if (ym === month) { items.push(j.desc); if (!lump) wage += +j.amount || 0; } });
+      if (lump && endM === month) wage += +b.wageOverride || 0;
+      (b.reimb || []).forEach(x => { if ((x.date || b.end || '').slice(0, 7) === month) reimb += +x.amount || 0; });
+    });
+    return { e, items, wage, reimb };
+  });
+}
+
+/* 匯入外包紀錄（每個工作表＝一個請款期，同期間會覆蓋） */
+function importPTBook(wb, fileName) {
+  const batches = [];
+  wb.SheetNames.forEach(n => { const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }); const b = T.parseSheet(n, rows); if (b) batches.push(b); });
+  if (!batches.length) return null;
+  const pts = empList().filter(isPT);
+  let emp = (isPT(st.emps[st.sel]) && st.emps[st.sel]) || pts.find(p => fileName.includes(p.name)) || pts[0];
+  if (!emp) { emp = newPT(); emp.order = empList().length + 1; st.emps[emp.id] = emp; save('employees/' + emp.id); }
+  batches.forEach(b => { b.emp = emp.id; b.taxRate = b.taxRate ?? (+emp.taxRate || 5); const k = ptKey(emp.id, b); st.months[k] = b; save('months/' + k); });
+  st.sel = emp.id; st.tab = 'pay'; st.ptSel = null;
+  return { emp, count: batches.length };
+}
+
+/* 匯出外包請款期 Excel（沿用原表欄位） */
+function ptSheet(row) {
+  const { b, c, opening, closing } = row;
+  const head = ['項目', '施工日期', '時數', '內容／地點', '備註', '工資', '稅金', '提供發票日期', '發票號碼', '含稅發票金額', '發票稅金', '稅金餘額'];
+  const aoa = [head, ['', b.title, '', '', '', '', '', '', '', '', '', opening]];
+  const n = Math.max((b.jobs || []).length, (b.inv || []).length);
+  for (let i = 0; i < n; i++) { const j = (b.jobs || [])[i] || {}, v = (b.inv || [])[i] || {}; aoa.push([j.desc != null ? i + 1 : '', (j.date || '').replace(/-/g, '/'), j.hours ?? '', j.desc || '', j.note || '', j.amount ?? '', '', (v.date || '').replace(/-/g, '/'), v.no || '', v.amount ?? '', v.tax ?? '', '']); }
+  aoa.push(['小計', '', c.hours || '', '', '', c.wage, c.tax, '', '', '', c.invTax, closing]);
+  aoa.push([], ['代墊款'], ['項目', '日期', '項目', '備註', '', '金額']);
+  (b.reimb || []).forEach((x, i) => aoa.push([i + 1, (x.date || '').replace(/-/g, '/'), x.item || '', x.note || '', '', x.amount]));
+  aoa.push(['總計', '', '', '', '', c.reimb], [], ['總金額', '', '', '', '', c.payable]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  Object.keys(ws).forEach(k => { if (k[0] === '!') return; const { r } = XLSX.utils.decode_cell(k); const v = ws[k].v; ws[k].s = { font: { name: XFONT, sz: 10.5, bold: r === 0 || ['小計', '總計', '總金額', '代墊款', '項目'].includes(v) }, alignment: { vertical: 'center', wrapText: true }, border: { bottom: { style: 'thin', color: { rgb: GRID } } }, ...(typeof v === 'number' ? { numFmt: '#,##0.##' } : {}), ...(r === 0 ? { fill: { patternType: 'solid', fgColor: { rgb: HEAD } } } : {}) }; });
+  ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 6 }, { wch: 30 }, { wch: 18 }, { wch: 10 }, { wch: 9 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 9 }, { wch: 10 }];
+  return ws;
+}
+function ptExport(emp, keys) {
+  const L = ptLedger(emp).filter(x => !keys || keys.includes(x.key));
+  const wb = XLSX.utils.book_new();
+  if (!keys) {
+    const sum = [[`${emp.name} 外包請款統計`], ['期間', '起日', '迄日', '筆數', '工資', '稅金', '代墊款', '應付總額', '發票稅金', '稅金餘額']];
+    L.forEach(x => sum.push([x.b.title, x.b.start, x.b.end, x.c.count, x.c.wage, x.c.tax, x.c.reimb, x.c.payable, x.c.invTax, x.closing]));
+    const ws = XLSX.utils.aoa_to_sheet(sum); ws['!cols'] = [{ wch: 20 }, { wch: 11 }, { wch: 11 }, { wch: 6 }, ...Array(6).fill({ wch: 11 })];
+    Object.keys(ws).forEach(k => { if (k[0] === '!') return; const { r } = XLSX.utils.decode_cell(k); ws[k].s = { font: { name: XFONT, sz: r ? 10.5 : 13, bold: r <= 1 }, numFmt: '#,##0.##', ...(r === 1 ? { fill: { patternType: 'solid', fgColor: { rgb: HEAD } } } : {}) }; });
+    XLSX.utils.book_append_sheet(wb, ws, '統計');
+  }
+  const used = new Set();
+  L.forEach(x => { let n = (x.b.title || x.b.start).replace(/[\\\/\?\*\[\]:]/g, '-').slice(0, 28); while (used.has(n)) n += '_'; used.add(n); XLSX.utils.book_append_sheet(wb, ptSheet(x), n); });
+  saveWb(wb, keys ? `外包請款-${emp.name}-${L[0] ? L[0].b.title.replace(/[\\\/\?\*\[\]:]/g, '-') : ''}.xlsx` : `外包請款紀錄-${emp.name}.xlsx`);
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act; const emp = st.emps[st.sel];
+  if (a === 'addpt') { const p = newPT(); p.order = empList().length + 1; st.emps[p.id] = p; st.sel = p.id; st.tab = 'emp'; save('employees/' + p.id); render(); }
+  else if (a === 'ptsel') { st.ptSel = b.dataset.key; st.tab = 'pay'; st.del = null; render(); }
+  else if (a === 'ptadd') {
+    const L = ptLedger(emp); const last = L.length ? L[L.length - 1].b : null;
+    const t = new Date(); let start = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-01`;
+    if (last && last.end) { const [y, m, d] = last.end.split('-').map(Number); const n = new Date(y, m - 1, d + 1); start = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`; }
+    const [y, m] = start.split('-').map(Number); const endD = new Date(y, m, 0); const end = `${endD.getFullYear()}-${String(endD.getMonth() + 1).padStart(2, '0')}-${String(endD.getDate()).padStart(2, '0')}`;
+    const nb = { kind: 'ptbatch', emp: emp.id, title: `${y}-${m} 月`, start, end, jobs: [], reimb: [], inv: [], taxRate: +emp.taxRate || 5, taxAdded: false };
+    let k = ptKey(emp.id, nb); while (st.months[k]) k += '_';
+    st.months[k] = nb; st.ptSel = k; save('months/' + k); render();
+  }
+  else if (a === 'ptrow') { const bt = st.months[b.dataset.key]; const sec = b.dataset.sec; bt[sec] = bt[sec] || []; bt[sec].push(sec === 'jobs' ? { date: '', desc: '', hours: null, amount: null, note: '' } : sec === 'reimb' ? { date: '', item: '', note: '', amount: 0 } : { date: '', no: '', amount: null, tax: null, note: '' }); save('months/' + b.dataset.key); render(); const el = document.querySelector(`[data-f="pt"][data-key="${CSS.escape(b.dataset.key)}"][data-sec="${sec}"][data-i="${bt[sec].length - 1}"][data-k="date"]`); if (el) el.focus(); }
+  else if (a === 'ptdelrow') { const bt = st.months[b.dataset.key]; bt[b.dataset.sec].splice(+b.dataset.i, 1); save('months/' + b.dataset.key); render(); }
+  else if (a === 'ptdelb') { const k = b.dataset.key; if (st.del !== k) { st.del = k; render(); return; } delete st.months[k]; removeDoc('months/' + k); st.del = null; st.ptSel = null; render(); toast('已刪除這個請款期'); }
+  else if (a === 'ptx') ptExport(emp, [b.dataset.key]);
+  else if (a === 'ptxall') ptExport(emp, null);
+});
+document.addEventListener('change', e => {
+  const el = e.target; if (!el.dataset || el.dataset.f !== 'pt') return;
+  const bt = st.months[el.dataset.key]; if (!bt) return;
+  const { sec, k } = el.dataset; const i = +el.dataset.i; const val = el.type === 'checkbox' ? el.checked : String(el.value).trim();
+  const tgt = sec === 'top' ? bt : bt[sec][i];
+  const numKeys = ['hours', 'amount', 'tax', 'taxRate', 'wageOverride', 'taxOverride', 'reimbOverride', 'payOverride', 'invTaxOverride', 'balOverride'];
+  if (k === 'date' || k === 'start' || k === 'end') { if (val === '') tgt[k] = ''; else { const d = T.parseDate(val); if (!d) { toast('日期請填 2026/11/6 或民國 115/11/6'); return; } tgt[k] = d; } }
+  else if (numKeys.includes(k)) { if (val === '') tgt[k] = null; else { const n = parseFloat(String(val).replace(/[,，]/g, '')); if (isNaN(n)) { toast('請填數字'); return; } tgt[k] = n; } }
+  else tgt[k] = val;
+  save('months/' + el.dataset.key);
+});
 
 /* ---------- 事件 ---------- */
 const recPath = emp => 'months/' + recKey(emp.id, st.month);
@@ -1298,7 +1673,7 @@ document.addEventListener('change', e => {
     st.settings.holidays = list.sort((a, b) => a[0].localeCompare(b[0])); save('config/main');
     if (bad) toast(`有 ${bad} 行看不懂日期，已略過`);
   }
-  render();
+  setTimeout(render, 0); // 等游標移到下一格再重畫，Tab 可以連續填寫
 });
 
 /* ---------- 匯入 ---------- */
@@ -1315,7 +1690,7 @@ async function importFiles(files) {
       const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
       let parsed = null;
       for (const name of wb.SheetNames) { try { const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null }); parsed = P.parsePunchRows(rows, st.settings); if (parsed.name) break; } catch (x) { parsed = null; } }
-      if (!parsed || !parsed.name) throw new Error('找不到「姓名：」或日期欄');
+      if (!parsed || !parsed.name) { const pr = importPTBook(wb, file.name); if (pr) { done.push(`${pr.emp.name} ${pr.count} 個請款期`); continue; } throw new Error('找不到「姓名：」或日期欄，也不是外包請款紀錄'); }
       let emp = empList().find(x => x.name === parsed.name);
       if (!emp) {
         emp = P.newEmployee(parsed.name); emp.order = empList().length + 1;
