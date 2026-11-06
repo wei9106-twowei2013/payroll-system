@@ -195,6 +195,8 @@ textarea.fi.small-ta{min-height:150px}
 .adj .lbl em{font-style:normal;font-size:11px;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:0 6px;margin-left:6px;font-weight:400}
 .adj .auto{color:var(--muted);text-align:right;font-size:13px}
 .adj .xrow.ovr input[data-k="amount"]{border-color:var(--warn);background:var(--warn-soft)}
+.adj .xrow.sys input[data-k="amount"]::placeholder{color:var(--muted);opacity:.55;font-size:12.5px}
+.adj .xrow.sys input[data-k="amount"]:hover{border-color:var(--accent)}
 .adj .xrow.ext{padding-top:5px;border-top:1px dashed var(--line)}
 .adj .xrow.ext + .xrow.ext{border-top:0;padding-top:0}
 .cb2{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--muted);white-space:nowrap}
@@ -989,11 +991,11 @@ function adjList(side, title, list, quick) {
   const sys = list.filter(x => !x.extra), ext = list.filter(x => x.extra);
   const total = list.reduce((a, x) => a + x.amount, 0);
   return `<div class="adj"><div class="adj-h"><h3>${title}</h3><b class="num">${money(total)}</b></div>
-    <div class="adj-cols"><span>項目</span><span>系統金額</span><span>本月金額</span><span>備註</span><span></span></div>
+    <div class="adj-cols"><span>項目</span><span>系統金額</span><span>本月金額（可改）</span><span>備註</span><span></span></div>
     ${sys.map(x => `<div class="xrow sys ${x.overridden ? 'ovr' : ''}">
       <span class="lbl">${esc(x.label)}${x.kind === 'attendance' ? '<em>全勤</em>' : ''}</span>
       <span class="auto num">${money(x.auto)}</span>
-      <input class="fi num" type="text" inputmode="numeric" value="${x.overridden ? esc(x.amount) : ''}" placeholder="${money(x.auto)}" data-f="ovr" data-key="${esc(x.key)}" data-k="amount" aria-label="${esc(x.label)} 本月金額">
+      <input class="fi num" type="text" inputmode="numeric" value="${x.overridden ? esc(x.amount) : ''}" placeholder="輸入金額" title="空白＝用系統金額 ${money(x.auto)}" data-f="ovr" data-key="${esc(x.key)}" data-k="amount" aria-label="${esc(x.label)} 本月金額">
       <input class="fi" type="text" value="${x.remark !== x.autoRemark ? esc(x.remark) : ''}" placeholder="${esc(x.autoRemark || '備註')}" data-f="ovr" data-key="${esc(x.key)}" data-k="remark" aria-label="${esc(x.label)} 備註">
       ${x.overridden || x.remark !== x.autoRemark ? `<button type="button" class="btn ghost small" data-act="resetovr" data-key="${esc(x.key)}" title="還原為系統金額" aria-label="還原">↺</button>` : '<span></span>'}
     </div>`).join('')}
