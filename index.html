@@ -202,6 +202,11 @@ textarea.fi.small-ta{min-height:150px}
 @media (max-width:560px){.adj-cols{display:none}.adj .xrow{grid-template-columns:1fr 1fr}.adj .xrow .lbl{grid-column:1/-1}}
 /* 班表 */
 .seg{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px}
+.inspick{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:12px}
+.inspick label.chk{display:flex;align-items:center;gap:6px;font-size:13.5px}
+.inspick label .num{color:var(--muted);font-size:12.5px}
+.inssum{flex-basis:100%;font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+.inssum b{color:var(--accent);font-weight:500}
 .seg label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .sched{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
 .sv-h,.sv-row{display:grid;grid-template-columns:130px repeat(5,78px) 110px 28px;gap:6px;align-items:center;min-width:760px}
@@ -301,7 +306,19 @@ const PAYCALC = (() => {
 
   const LABOR_TABLE = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800];
   const HEALTH_TABLE = [29500, 30300, 31800, 33300, 34800, 36300, 38200, 40100, 42000, 43900, 45800, 48200, 50600, 53000, 55400, 57800, 60800, 63800, 66800, 69800, 72800, 76500, 80200, 83900, 87600, 92100, 96600, 101100, 105600, 110100, 115500, 120900, 126300, 131700, 137100, 142500, 147900, 150000, 156400, 162800, 169200, 175600, 182000, 189500, 197000, 204500, 212000, 219500, 228200, 236900, 245600, 254300, 263000, 273000, 283000, 293000, 303000, 313000];
+  /* 勞保費：普通事故與就業保險分開計算、各自四捨五入（同勞保局保費表） */
+  const r2 = x => Math.round(Math.round(x * 1e6) / 1e6);
+  const laborDue = (wage, S, share) => { const job = S.laborJob ?? 1; return r2(wage * (S.laborRate - job) / 100 * share / 100) + r2(wage * job / 100 * share / 100); };
   const bracket = (table, wage) => { for (const v of table) if (wage <= v) return v; return table[table.length - 1]; };
+  /* 投保金額：手動填寫，或依勾選的固定薪資項目加總後對應級距 */
+  function insured(emp) {
+    if (emp && emp.insMode === 'auto') {
+      const picked = (emp.items || []).filter(i => i.ins);
+      const wage = picked.reduce((a, i) => a + (+i.amount || 0), 0);
+      return { auto: true, wage, picked: picked.map(i => i.label), labor: bracket(LABOR_TABLE, wage), health: bracket(HEALTH_TABLE, wage), pension: Math.min(150000, bracket(HEALTH_TABLE, wage)) };
+    }
+    return { auto: false, labor: +(emp && emp.labor) || 0, health: +(emp && emp.health) || 0, pension: +(emp && emp.pension) || 0 };
+  }
 
   const LEAVES = {
     '特休': { pay: 1, att: false }, '補休': { pay: 1, att: false }, '公假': { pay: 1, att: false },
@@ -319,12 +336,12 @@ const PAYCALC = (() => {
     unit: 1, grace: 0, lateMode: 'fixed', latePerMin: 1,
     lateFreeMin: 15, lateKillsAtt: true, lateDeductOver: true,
     mealPerDay: 60, mealInBase: false,
-    laborRate: 12.5, laborEmp: 20, laborEr: 70,
+    laborRate: 12.5, laborJob: 1, laborEmp: 20, laborEr: 70,
     healthRate: 5.17, healthEmp: 30, healthEr: 60, healthAvgDep: 0.56,
     pensionEr: 6, otCap: 46,
     fieldWords: '佈展,卸展,施工,監工,出差',
     mealWords: '佈展,卸展,施工',
-    quickEarn: ['全勤獎金', '專案獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '停車費'],
+    quickEarn: ['全勤獎金', '專案獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '出差私車保養補助', '停車費'],
     quickDed: ['預支', '代扣款', '其他'],
     holidays: [
       ['2026-01-01', '開國紀念日'], ['2026-02-16', '除夕'], ['2026-02-17', '春節'], ['2026-02-18', '春節'],
@@ -576,9 +593,10 @@ const PAYCALC = (() => {
     const deductions = [];
     const addD = (key, label, auto, remark) => { const amt = O(key, auto); deductions.push({ key, label, auto, amount: amt, autoRemark: remark, remark: R_(key, remark), overridden: amt !== auto }); };
     const deps = Math.min(3, +emp.deps || 0);
-    addD('labor', '勞保自付額', Math.round((+emp.labor || 0) * S.laborRate / 100 * S.laborEmp / 100), '');
-    addD('health', '健保自付額', Math.round((+emp.health || 0) * S.healthRate / 100 * S.healthEmp / 100) * (1 + deps), deps ? `本人＋${deps} 眷屬` : '');
-    if (+emp.selfPension) addD('pension', '勞退自提', Math.round((+emp.pension || 0) * (+emp.selfPension) / 100), `${emp.selfPension}%`);
+    const I = insured(emp);
+    addD('labor', '勞保自付額', laborDue(I.labor, S, S.laborEmp), '');
+    addD('health', '健保自付額', Math.round(I.health * S.healthRate / 100 * S.healthEmp / 100) * (1 + deps), deps ? `本人＋${deps} 眷屬` : '');
+    if (+emp.selfPension) addD('pension', '勞退自提', Math.round(I.pension * (+emp.selfPension) / 100), `${emp.selfPension}%`);
     const latePropCap = lateMin * R / 60;
     const lateAmt = (!lateOver || S.lateDeductOver === false) ? 0 : Math.round(S.lateMode === 'prop' ? latePropCap : Math.min(lateMin * (+S.latePerMin || 0), latePropCap));
     addD('late', '遲到早退', lateAmt, lateMin ? (lateOver ? `${lateMin} 分鐘` : `${lateMin} 分鐘（${lateFree} 分鐘內不扣）`) : '');
@@ -593,17 +611,17 @@ const PAYCALC = (() => {
     const gross = earnings.reduce((a, x) => a + x.amount, 0);
     const ded = deductions.reduce((a, x) => a + x.amount, 0);
     const employer = {
-      labor: Math.round((+emp.labor || 0) * S.laborRate / 100 * S.laborEr / 100),
-      health: Math.round((+emp.health || 0) * S.healthRate / 100 * S.healthEr / 100 * (1 + (+S.healthAvgDep || 0))),
-      pension: Math.round((+emp.pension || 0) * S.pensionEr / 100)
+      labor: laborDue(I.labor, S, S.laborEr),
+      health: Math.round(I.health * S.healthRate / 100 * S.healthEr / 100 * (1 + (+S.healthAvgDep || 0))),
+      pension: Math.round(I.pension * S.pensionEr / 100)
     };
     const wageTotal = (emp.items || []).reduce((a, i) => a + (+i.amount || 0), 0);
     const sug = { labor: bracket(LABOR_TABLE, wageTotal), health: bracket(HEALTH_TABLE, wageTotal) };
-    if ((+emp.labor || 0) < Math.min(sug.labor, LABOR_TABLE[10])) flags.push(`勞保投保 ${(+emp.labor).toLocaleString()} 低於月薪對應級距 ${sug.labor.toLocaleString()}`);
-    if ((+emp.health || 0) < sug.health) flags.push(`健保投保 ${(+emp.health).toLocaleString()} 低於月薪對應級距 ${sug.health.toLocaleString()}`);
+    if (!I.auto && I.labor < Math.min(sug.labor, LABOR_TABLE[10])) flags.push(`勞保投保 ${I.labor.toLocaleString()} 低於月薪對應級距 ${sug.labor.toLocaleString()}`);
+    if (!I.auto && I.health < sug.health) flags.push(`健保投保 ${I.health.toLocaleString()} 低於月薪對應級距 ${sug.health.toLocaleString()}`);
     const overrides = [...earnings, ...deductions].filter(x => x.overridden).length;
 
-    return { lateOver, attGone, lateFree, mealPer, rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
+    return { ins: I, lateOver, attGone, lateFree, mealPer, rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
   }
 
   /* 匯入現有打卡表（員工打卡表／居家辦公打卡表格式） */
@@ -663,7 +681,7 @@ const PAYCALC = (() => {
     return { name, month, salary, days, typicalIn: mode(Object.values(days).map(x => x.in).filter(Boolean)), typicalOut: mode(Object.values(days).map(x => x.out).filter(Boolean)) };
   }
 
-  return { normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
+  return { insured, laborDue, normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
 })();
 if (typeof module !== 'undefined') module.exports = PAYCALC;
 
@@ -760,7 +778,7 @@ function enterApp(user) {
     if (st.ready && changed) render(); done();
   }, handleErr));
   unsubs.push(onSnapshot(doc(fdb, COLL.config, 'main'), s => {
-    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (Array.isArray(v.quickEarn)) v.quickEarn = v.quickEarn.map(x => x === '工作獎金' ? '專案獎金' : x); if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
+    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (Array.isArray(v.quickEarn)) v.quickEarn = v.quickEarn.map(x => x === '工作獎金' ? '專案獎金' : x); if (Array.isArray(v.quickEarn) && !v.quickEarn.includes('出差私車保養補助') && !v.addedCarMaint) { const i = v.quickEarn.indexOf('過路費'); v.quickEarn.splice(i >= 0 ? i + 1 : v.quickEarn.length, 0, '出差私車保養補助'); v.addedCarMaint = true; } if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
     done();
   }, handleErr));
   resetIdle();
@@ -1086,8 +1104,16 @@ function viewEmp() {
         <p class="hint" style="margin-top:8px">特休天數：6 個月 3 天、1 年 7 天、2 年 10 天、3 年 14 天、5 年 15 天，10 年以上每年加 1 天至 30 天。年度結束當月，「本月薪資」會自動帶出未休時數與折算金額（日薪＝經常性給與 ÷ 30）。</p>`; })()}
     </section>
     <section class="panel"><div class="ph"><h2>保險與勞退</h2></div>
-      <div class="form">${f('labor', '勞保投保薪資', 'number')}${f('health', '健保投保金額', 'number')}${f('deps', '健保眷屬人數', 'number', 'min="0" max="10"')}${f('pension', '勞退月提繳工資', 'number')}${f('selfPension', '勞退自提 %', 'number', 'min="0" max="6" step="0.5"')}${f('sickYtdH', '今年已請病假時數（本月以前）', 'number')}</div>
-      <p class="hint ${emp.labor < Math.min(r.sug.labor, 45800) || emp.health < r.sug.health ? 'warn' : ''}" style="margin-top:10px">依固定薪資 ${money(emp.items.reduce((a, i) => a + (+i.amount || 0), 0))} 元，對應勞保級距 ${money(r.sug.labor)}、健保級距 ${money(r.sug.health)}。病假一年未逾 10 日（80 小時）不影響全勤。</p></section>`;
+      <div class="seg" role="radiogroup" aria-label="投保金額">
+        <label><input type="radio" name="imode" value="manual" ${emp.insMode !== 'auto' ? 'checked' : ''} data-f="emp" data-k="insMode">手動填寫投保金額</label>
+        <label><input type="radio" name="imode" value="auto" ${emp.insMode === 'auto' ? 'checked' : ''} data-f="emp" data-k="insMode">依勾選的薪資項目自動計算</label>
+      </div>
+      ${emp.insMode === 'auto' ? `<div class="inspick">
+        ${emp.items.map((it, i) => `<label class="chk"><input type="checkbox" ${it.ins ? 'checked' : ''} data-f="item" data-i="${i}" data-k="ins">${esc(it.label)}<span class="num">${money(it.amount)}</span></label>`).join('')}
+        <div class="inssum">加總 <b class="num">${money(r.ins.wage)}</b> 元 → 勞保 <b class="num">${money(r.ins.labor)}</b>・健保 <b class="num">${money(r.ins.health)}</b>・勞退 <b class="num">${money(r.ins.pension)}</b></div>
+      </div>` : ''}
+      <div class="form">${emp.insMode === 'auto' ? `<label>勞保投保薪資<input class="fi num" type="text" value="${money(r.ins.labor)}" disabled></label><label>健保投保金額<input class="fi num" type="text" value="${money(r.ins.health)}" disabled></label>` : `${f('labor', '勞保投保薪資', 'number')}${f('health', '健保投保金額', 'number')}`}${f('deps', '健保眷屬人數', 'number', 'min="0" max="10"')}${emp.insMode === 'auto' ? `<label>勞退月提繳工資<input class="fi num" type="text" value="${money(r.ins.pension)}" disabled></label>` : f('pension', '勞退月提繳工資', 'number')}${f('selfPension', '勞退自提 %', 'number', 'min="0" max="6" step="0.5"')}${f('sickYtdH', '今年已請病假時數（本月以前）', 'number')}</div>
+      <p class="hint" style="margin-top:10px">本月自付額：勞保 ${money(r.deductions.find(x => x.key === 'labor').auto)} 元、健保 ${money(r.deductions.find(x => x.key === 'health').auto)} 元。依全部固定薪資 ${money(emp.items.reduce((a, i) => a + (+i.amount || 0), 0))} 元，對應勞保級距 ${money(r.sug.labor)}、健保級距 ${money(r.sug.health)}。病假一年未逾 10 日（80 小時）不影響全勤。</p></section>`;
   })();
   return `<div class="layout">${roster(st.sel)}<div style="min-width:0">${body}</div></div>`;
 }
@@ -1128,7 +1154,7 @@ function viewSet() {
   </div></section>
   <section class="panel"><div class="ph"><h2>加班費率與保險費率</h2></div>
   <div class="form">${f('wd1', '平日前 2 小時')}${f('wd2', '平日第 3、4 小時')}${f('rd1', '休息日前 2 小時')}${f('rd2', '休息日第 3–8 小時')}${f('rd3', '休息日第 9–12 小時')}
-    ${f('laborRate', '勞保費率 %（含就保）')}${f('laborEmp', '勞保勞工負擔 %')}${f('laborEr', '勞保雇主負擔 %')}
+    ${f('laborRate', '勞保費率 %（含就保）')}${f('laborJob', '其中就業保險費率 %')}${f('laborEmp', '勞保勞工負擔 %')}${f('laborEr', '勞保雇主負擔 %')}
     ${f('healthRate', '健保費率 %')}${f('healthEmp', '健保勞工負擔 %')}${f('healthEr', '健保雇主負擔 %')}${f('healthAvgDep', '健保平均眷口數')}${f('pensionEr', '勞退雇主提繳 %')}
   </div><p class="hint" style="margin-top:10px">預設值為 115 年度：勞保 12.5%、健保 5.17%、基本工資月薪 29,500 元。加班費率不得低於法定倍數。</p></section>
   <section class="panel"><div class="ph"><h2>國定假日與補假日</h2><span class="hint">一行一天：日期 名稱。落在週六日的節日請填實際補假日。</span></div>
@@ -1233,6 +1259,7 @@ document.addEventListener('change', e => {
     else if (k === 'mealPerDay') { const n = toInt(val); emp.mealPerDay = String(val).trim() === '' || n === null ? '' : n; }
     else if (k === 'hire') { if (String(val).trim() === '') emp.hire = ''; else { const d = parseDate(val); if (!d) { toast('到職日請填 2024/10/01 或民國 113/10/1'); render(); return; } emp.hire = d; } }
     else if (k === 'leavePriorH') { const a = P.annualLeave(emp.hire, todayStr()); emp.leavePrior = { period: a && a.start, h: parseFloat(val) || 0 }; }
+    else if (k === 'insMode') { emp.insMode = val; if (val === 'auto' && !emp.items.some(i => i.ins)) emp.items.forEach(i => { i.ins = true; }); }
     else if (k === 'schedMode') { emp.schedMode = val; if (val === 'custom' && (!emp.scheds || !emp.scheds.length)) emp.scheds = [clone(P.schedFor(null, todayStr(), st.settings))]; }
     else emp[k] = val;
     save('employees/' + emp.id);
