@@ -273,6 +273,15 @@ table.pt-i th:nth-child(3){width:130px}table.pt-i th:nth-child(4){width:96px}tab
 .flags.info{margin:10px 0 0}
 .flags.info li{background:var(--accent-soft);color:var(--accent);font-size:12.5px;padding:4px 10px}
 table.sum tr.sel td{background:var(--accent-soft)}
+.suggest{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 14px;border-radius:var(--r);background:var(--accent-soft);color:var(--ink);margin-bottom:14px;font-size:13.5px}
+.suggest b{font-weight:500;color:var(--accent)}
+table.pt.trip th:nth-child(1){width:60px}table.pt.trip th:nth-child(4),table.pt.trip th:nth-child(5){width:96px}table.pt.trip th:nth-child(6){width:auto}
+.tripsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:12px}
+.tripsum div{border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.tripsum span{font-size:12px;color:var(--muted)}
+.tripsum b{font-size:18px;font-weight:500;color:var(--accent)}
+.tripsum small{font-size:11.5px;color:var(--muted)}
+.okv{font-size:11.5px;color:var(--good)!important}.badv{font-size:11.5px;color:var(--bad)!important}
 @media (prefers-reduced-motion:no-preference){.who,.btn{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -349,7 +358,7 @@ const PAYCALC = (() => {
     '特休': { pay: 1, att: false }, '補休': { pay: 1, att: false }, '公假': { pay: 1, att: false },
     '婚假': { pay: 1, att: false }, '喪假': { pay: 1, att: false }, '其他有薪': { pay: 1, att: false },
     '病假': { pay: 0.5, att: 'sick' }, '生理假': { pay: 0.5, att: false },
-    '事假': { pay: 0, att: true }, '家庭照顧假': { pay: 0, att: false }
+    '事假': { pay: 0, att: true }, '家庭照顧假': { pay: 0, att: false }, '颱風假': { pay: 0, att: false }
   };
 
   const DEFAULT_SETTINGS = {
@@ -361,6 +370,7 @@ const PAYCALC = (() => {
     unit: 1, grace: 0, lateMode: 'fixed', latePerMin: 1,
     lateFreeMin: 15, lateKillsAtt: true, lateDeductOver: true,
     mealPerDay: 60, mealInBase: false,
+    fuelKmPerL: 12, fuelPrice: 32, maintPerKm: 0.5,
     laborRate: 12.5, laborJob: 1, laborEmp: 20, laborEr: 70,
     healthRate: 5.17, healthEmp: 30, healthEr: 60, healthAvgDep: 0.56,
     pensionEr: 6, otCap: 46,
@@ -501,6 +511,7 @@ const PAYCALC = (() => {
     const holMap = {}; (S.holidays || []).forEach(([d, n]) => { holMap[d] = n || '國定假日'; });
     const days = (rec && rec.days) || {};
     const ovr = (rec && rec.ovr) || {};
+    const actual = !!(rec && rec.format === 'home');
     const rows = []; const flags = [];
     let workdays = 0, mealDays = 0, lateMin = 0, unpaidH = 0, halfH = 0, attH = 0, sickH = 0, compMin = 0, capMin = 0, excessMin = 0;
     const otMin = { work: 0, rest: 0, regular: 0, holiday: 0 };
@@ -518,23 +529,42 @@ const PAYCALC = (() => {
         usedScheds.set(JSON.stringify(v), v);
         if (lv) { const L = LEAVES[lv]; if (L.pay === 0) unpaidH += lvH; else if (L.pay === 0.5) halfH += lvH; if (L.att === true) attH += lvH; if (L.att === 'sick') sickH += lvH; }
         const tin = toMin(day.in), tout = toMin(day.out);
-        if (tin != null && !day.field && !(lv && lvH < 8)) r.late += Math.max(0, tin - (si.s + (+S.grace || 0)));
-        if (tout != null && !day.field && !lv && toMin(day.os) == null && tout < si.e) r.late += si.e - tout;
+        if (actual) {
+          // 在家版：依當天實際的上下班、午休、外出時間計算
+          const brks = [[day.ls, day.le], [day.b1s, day.b1e]].map(([a, b]) => [toMin(a), toMin(b)]).filter(([a, b]) => a != null && b != null && b > a);
+          const os0 = toMin(day.os);
+          let endN = null;
+          if (tin != null && tout != null) { endN = tout >= tin ? tout : tout + 1440; if (os0 != null) endN = Math.min(endN, os0 >= tin ? os0 : os0 + 1440); }
+          const workedN = endN != null ? Math.max(0, endN - tin - brks.reduce((t, [a, b]) => t + overlap(tin, endN, a, b), 0)) : 0;
+          const target = Math.max(0, si.normal - (lv ? lvH * 60 : 0));
+          const late = tin != null && !day.field && !(lv && lvH < 8) ? Math.max(0, tin - (si.s + (+S.grace || 0))) : 0;
+          const early = tin != null && !day.field && !(lv && lvH >= 8) ? Math.max(0, target - workedN - late) : 0;
+          r.late += late + early; r.worked = workedN;
+          if (tin != null && os0 == null && workedN > si.normal + 30) r.warn.push(`實際工作 ${dur(workedN)}，超過應工作 ${dur(si.normal)}；若有加班請填加班開始／結束`);
+          if (os0 != null && workedN > si.normal + 30) r.warn.push(`加班開始前已工作 ${dur(workedN)}，多出的 ${workedN - si.normal} 分鐘未計加班，請確認`);
+        } else {
+          if (tin != null && !day.field && !(lv && lvH < 8)) r.late += Math.max(0, tin - (si.s + (+S.grace || 0)));
+          if (tout != null && !day.field && !lv && toMin(day.os) == null && tout < si.e) r.late += si.e - tout;
+        }
         lateMin += r.late;
         if (tin == null && !lv && !day.field) r.warn.push('無打卡紀錄，請填假別');
         if (emp.mealMode === 'field') { if (day.field && !day.meal && lvH < 8) mealDays++; }
         else if ((tin != null || day.field) && lvH < 8 && emp.mealMode !== 'none' && !day.meal) mealDays++;
         // 正常工時超過 8 小時的部分（§30）
         let worked = 0;
-        if (tin != null && tout != null) { const a = Math.max(tin, si.s), b = Math.min(tout >= tin ? tout : tout + 1440, si.e); worked = si.segs.reduce((t, [, x, y]) => t + overlap(a, b, x, y), 0); }
+        if (actual) worked = 0;
+        else if (tin != null && tout != null) { const a = Math.max(tin, si.s), b = Math.min(tout >= tin ? tout : tout + 1440, si.e); worked = si.segs.reduce((t, [, x, y]) => t + overlap(a, b, x, y), 0); }
         else if (day.field && !lv) worked = si.normal;
         r.excess = Math.max(0, worked - 480);
         // 下班後加班
         let evening = 0;
         let s = toMin(day.os), e = toMin(day.oe);
-        if (s == null && e == null && tout != null && tout > si.ot) { s = si.ot; e = tout; }
-        if (s == null && e != null) s = si.ot;
-        if (s != null && e != null) { if (e < s) e += 1440; evening = Math.max(0, e - Math.max(s, si.ot) - (+day.rest || 0)); }
+        if (actual) { if (s != null && e != null) { if (e < s) e += 1440; evening = Math.max(0, e - s - (+day.rest || 0)); } }
+        else {
+          if (s == null && e == null && tout != null && tout > si.ot) { s = si.ot; e = tout; }
+          if (s == null && e != null) s = si.ot;
+          if (s != null && e != null) { if (e < s) e += 1440; evening = Math.max(0, e - Math.max(s, si.ot) - (+day.rest || 0)); }
+        }
         r.ot = floorU(r.excess + evening, S.unit);
         if (r.ot > 0) {
           capMin += r.ot; excessMin += r.excess;
@@ -612,6 +642,15 @@ const PAYCALC = (() => {
     const otRemark = otParts.join('、');
     earnings.push({ key: 'ot', label: '加班費', auto: otAuto, amount: otPay, autoRemark: otRemark, remark: R_('ot', otRemark), overridden: otPay !== otAuto });
     if (emp.mealMode !== 'none') { const mr = emp.mealMode === 'fixed' ? '每月固定' : emp.mealMode === 'field' ? `外勤 ${mealDays} 天 × ${mealPer} 元` : `${mealDays} 天 × ${mealPer} 元`; earnings.push({ key: 'meal', label: '餐費', auto: mealAuto, amount: mealAmt, autoRemark: mr, remark: R_('meal', mr), overridden: mealAmt !== mealAuto }); }
+    // 出差：油資、過路費、私車保養補助（依每日里程與過路費）
+    const tc = Object.assign({ kmPerL: +S.fuelKmPerL || 12, price: +S.fuelPrice || 32, maintPerKm: +S.maintPerKm || 0 }, Object.fromEntries(Object.entries((rec && rec.tripCfg) || {}).filter(([, v]) => v != null && v !== '')));
+    let km = 0, toll = 0, trips = 0;
+    Object.entries(days).forEach(([d, x]) => { if (d.startsWith(month) && x.trip) { km += +x.trip.km || 0; toll += +x.trip.toll || 0; if (x.trip.km || x.trip.toll || x.trip.to) trips++; } });
+    const trip = { km, toll, trips, cfg: tc, fuel: tc.kmPerL ? Math.round(km / tc.kmPerL * tc.price) : 0, maint: Math.round(km * tc.maintPerKm) };
+    const addE = (key, label, auto, remark) => { const amt = O(key, auto); if (!auto && !ovr[key]) return; earnings.push({ key, label, auto, amount: amt, autoRemark: remark, remark: R_(key, remark), overridden: amt !== auto }); };
+    addE('fuel', '出差油資費補助', trip.fuel, km ? `${km} 公里 ÷ ${tc.kmPerL} 公里/公升 × ${tc.price} 元` : '');
+    addE('toll', '過路費', toll, trips ? `出差 ${trips} 天` : '');
+    addE('maint', '出差私車保養補助', trip.maint, km ? `${km} 公里 × ${tc.maintPerKm} 元` : '');
     extras.forEach(x => earnings.push(x));
 
     // 應扣
@@ -646,10 +685,27 @@ const PAYCALC = (() => {
     if (!I.auto && I.health < sug.health) flags.push(`健保投保 ${I.health.toLocaleString()} 低於月薪對應級距 ${sug.health.toLocaleString()}`);
     const overrides = [...earnings, ...deductions].filter(x => x.overridden).length;
 
-    return { ins: I, lateOver, attGone, lateFree, mealPer, rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
+    return { trip, ins: I, lateOver, attGone, lateFree, mealPer, rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
   }
 
-  /* 匯入現有打卡表（員工打卡表／居家辦公打卡表格式） */
+  /* 請假判斷：假別＋時數（支援「四小時」「半天」「1天」），照顧小孩視為家庭照顧假 */
+  const CN = { 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8 };
+  const numOf = t => t == null ? null : (CN[t] != null ? CN[t] : (isNaN(+t) ? null : +t));
+  function parseLeave(note) {
+    const types = '特休|事假|病假|補休|公假|婚假|喪假|生理假|家庭照顧假|颱風假';
+    let type = (new RegExp(`(${types})`).exec(note) || [])[1] || '';
+    if (/顧小孩|照顧(小孩|家人|孩子)|家庭照顧/.test(note)) type = '家庭照顧假';
+    if (!type || type === '颱風假' && !/請/.test(note)) { if (type === '颱風假') type = ''; }
+    if (!type) return null;
+    const H = '([一二兩三四五六七八]|\\d+(?:\\.\\d+)?)\\s*(小時|時|h|H|天|日)';
+    let m = new RegExp(`請\\s*${H}`).exec(note) || new RegExp(`(?:${types})\\s*${H}`).exec(note) || new RegExp(H).exec(note);
+    let h = 8;
+    if (/半天/.test(note)) h = 4;
+    if (m) { const n = numOf(m[1]); if (n != null) h = /天|日/.test(m[2]) ? n * 8 : n; }
+    return { type, h: Math.max(0.5, Math.min(8, h)) };
+  }
+
+  /* 匯入打卡表：公司版「員工打卡表」與在家版「員工出勤及出差彙整表」 */
   function parsePunchRows(rows, S) {
     S = Object.assign({}, DEFAULT_SETTINGS, S || {});
     const txt = v => v == null ? '' : String(v);
@@ -666,47 +722,75 @@ const PAYCALC = (() => {
     const col = test => H.findIndex(test);
     const C = {
       d: col(h => h === '日期'), in: col(h => h.startsWith('上班')), out: col(h => h.startsWith('下班')),
+      ls: col(h => h === '午休開始'), le: col(h => h === '午休結束'), b1s: col(h => h === '外出'), b1e: col(h => h === '外出回來'),
       os: col(h => h === '加班開始'), oe: col(h => h === '加班結束'), note: col(h => h.startsWith('備註')),
-      rest: col(h => h === '休息' || h.includes('休息時間') || h.includes('用餐'))
+      rest: col(h => h === '休息' || h.includes('休息時間') || h.includes('用餐')),
+      from: col(h => h === '出發地點'), to: col(h => h === '目的地'), toll: col(h => h === '過路費'), km: col(h => h.startsWith('里程')), tnote: col(h => h === '出差備註')
     };
+    const home = C.ls >= 0 || C.from >= 0;
     const toDate = v => {
       if (v instanceof Date) return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}`;
       if (typeof v === 'number' && v > 20000) { const ms = Math.round((v - 25569) * 86400000); const dt = new Date(ms); return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`; }
       const m = /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/.exec(txt(v)); return m ? `${m[1]}-${pad(m[2])}-${pad(m[3])}` : null;
     };
+    // 時間欄：只取時刻（有些表的時間連同日期一起存，例如 2026/11/4 08:30）
     const toT = v => {
       if (v == null || v === '') return null;
       if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
-      if (typeof v === 'number') { if (v >= 1) return null; return Math.round(v * 1440) % 1440; }
+      if (typeof v === 'number') return Math.round((v - Math.floor(v)) * 1440) % 1440;
       return toMin(txt(v));
     };
+    const numv = v => { if (v == null || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(txt(v).replace(/[,，]/g, '')); return isNaN(n) ? null : n; };
     const fieldRe = new RegExp((S.fieldWords || '').split(/[,，]/).filter(Boolean).join('|') || '^$');
     const mealRe = new RegExp((S.mealWords || '').split(/[,，]/).filter(Boolean).join('|') || '^$');
     const days = {};
+    let lastRow = head;
     for (let i = head + 1; i < rows.length; i++) {
       const r = rows[i] || []; const d = toDate(r[C.d]); if (!d) continue;
+      lastRow = i;
       const note = C.note >= 0 ? txt(r[C.note]).trim() : '';
       const day = {};
       const t = k => { const v = C[k] >= 0 ? toT(r[C[k]]) : null; if (v != null) day[k] = fmtMin(v); };
-      t('in'); t('out'); t('os'); t('oe');
+      t('in'); t('out'); t('os'); t('oe'); t('ls'); t('le'); t('b1s'); t('b1e');
+      if (!day.in && !day.out) { delete day.ls; delete day.le; delete day.b1s; delete day.b1e; }
       if (C.rest >= 0) { const v = toT(r[C.rest]); if (v) day.rest = v; }
       if (note) {
         day.note = note;
-        const lm = /(特休|事假|病假|補休|公假|婚假|喪假|生理假|家庭照顧假)\s*(\d+(?:\.\d+)?)?\s*(小時|時|h|H|天|日)?/.exec(note);
-        if (lm) { day.leave = lm[1]; let h = lm[2] ? +lm[2] : 8; if (lm[2] && /天|日/.test(lm[3] || '')) h *= 8; day.leaveH = h; }
+        const lv = parseLeave(note); if (lv) { day.leave = lv.type; day.leaveH = lv.h; }
         if (fieldRe.test(note)) day.field = true;
         if (mealRe.test(note)) day.meal = true;
+      }
+      // 出差：出發地點、目的地、過路費、里程、出差備註
+      if (C.to >= 0 || C.km >= 0) {
+        const trip = { from: txt(at(r, C.from)).trim(), to: txt(at(r, C.to)).trim(), toll: numv(at(r, C.toll)) || 0, km: numv(at(r, C.km)) || 0, note: txt(at(r, C.tnote)).trim() };
+        if (trip.to || trip.km || trip.toll) { day.trip = trip; day.field = true; if (/外食/.test(trip.note)) delete day.meal; }
       }
       if (Object.keys(day).length) days[d] = day;
     }
     const keys = Object.keys(days).sort();
     const month = year && mon ? `${year}-${pad(mon)}` : (keys[0] || '').slice(0, 7);
     Object.keys(days).forEach(k => { if (!k.startsWith(month)) delete days[k]; });
+    // 油資參數：說明文字「每公升行駛 13 公里、每公升 32.7 元」；保養補助＝保養金額 ÷ 里程
+    let tripCfg = null, tripSrc = null;
+    if (home) {
+      const all = rows.slice(lastRow + 1).map(r => (r || []).map(txt).join(' ')).join('\n');
+      const fm = /每公升行駛\s*(\d+(?:\.\d+)?)\s*公里[^\n]*?每公升\s*(\d+(?:\.\d+)?)\s*元/.exec(all);
+      const hr = rows.findIndex((r, i) => i > lastRow && (r || []).some(c => txt(c).includes('里程合計')));
+      if (hr >= 0) {
+        const hh = rows[hr].map(c => txt(c).trim()), vv = rows[hr + 1] || [];
+        const pick = k => { const i = hh.findIndex(x => x.includes(k)); return i >= 0 ? numv(vv[i]) : null; };
+        tripSrc = { km: pick('里程合計'), fuel: pick('油資'), toll: pick('過路費'), maint: pick('保養') };
+      }
+      tripCfg = { kmPerL: fm ? +fm[1] : null, price: fm ? +fm[2] : null, maintPerKm: tripSrc && tripSrc.km && tripSrc.maint != null ? Math.round(tripSrc.maint / tripSrc.km * 100) / 100 : null };
+    }
     const mode = arr => { const c = {}; arr.forEach(x => c[x] = (c[x] || 0) + 1); return Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0]; };
-    return { name, month, salary, days, typicalIn: mode(Object.values(days).map(x => x.in).filter(Boolean)), typicalOut: mode(Object.values(days).map(x => x.out).filter(Boolean)) };
+    const wk = Object.entries(days).filter(([d, x]) => { const w = new Date(d).getDay(); return w > 0 && w < 6 && x.in && x.out && !x.leave; }).map(([, x]) => x);
+    const typical = home && wk.length ? ['in', 'ls', 'le', 'b1s', 'b1e', 'out'].reduce((o, k) => { const v = mode(wk.map(x => x[k] || '')); if (v) o[k] = v; return o; }, {}) : null;
+    return { name, month, salary, days, home, tripCfg, tripSrc, typical, typicalIn: mode(Object.values(days).map(x => x.in).filter(Boolean)), typicalOut: mode(Object.values(days).map(x => x.out).filter(Boolean)) };
   }
+  const at = (r, i) => i >= 0 ? r[i] : null;
 
-  return { insured, laborDue, normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
+  return { parseLeave, insured, laborDue, normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
 })();
 if (typeof module !== 'undefined') module.exports = PAYCALC;
 
@@ -1101,13 +1185,21 @@ function viewPay() {
     </div>
   </div>
   ${flagHtml}
+  ${(() => { if (!rec || rec.format !== 'home' || !rec.typical || !rec.typical.in) return '';
+    const t = rec.typical, v = P.schedFor(emp, st.month + '-01', st.settings);
+    const same = t.in === v.start && (t.ls || v.ls) === v.ls && (t.le || v.le) === v.le && (t.b1s || '') === (v.b1s || '') && (t.b1e || '') === (v.b1e || '') && t.out === v.end;
+    if (same) return '';
+    const lbl = [`${t.in}–${t.ls || v.ls}`, t.b1s && t.b1e ? `${t.le || v.le}–${t.b1s}、${t.b1e}–${t.out}` : `${t.le || v.le}–${t.out}`].join('、');
+    return `<div class="suggest"><span>本月打卡表最常見的時段是 <b>${esc(lbl)}</b>，和目前班表 ${esc(P.schedLabel(v))} 不同，遲到早退會依班表計算。</span><button type="button" class="btn small primary" data-act="applytyp">套用為 ${+st.month.slice(5)}/1 起的個人班表</button></div>`; })()}
   <section class="panel">
     <div class="ph"><h2>每日出勤<small>${rec ? '可直接修改，離開欄位即重新計算' : '本月尚無紀錄，可匯入打卡表或直接填寫'}</small></h2>
       <div class="acts"><button type="button" class="btn small" data-act="fillstd">空白工作日填入班表</button><button type="button" class="btn small" data-act="import">匯入打卡表</button></div></div>
     <div class="drop" id="drop" hidden></div>
     <div class="tscroll">${dayTable(emp, rec, r)}</div>
+    ${rec && rec.format === 'home' ? '<p class="hint" style="margin-top:6px">本月是在家版打卡表：依每天實際的上班、午休、外出、下班時間計算工時；加班以表上的加班開始／結束為準。滑鼠移到 ⓘ 可看當天的午休、外出與出差。</p>' : ''}
     <div class="legend"><span>外勤：佈展、出差等，不計遲到</span><span>供餐：公司已支付餐費，不發餐費</span><span>補休：勞工選擇以補休代替加班費（§32-1）</span><span>休息：加班中的休息分鐘，可填 90 或 1:30</span></div>
   </section>
+  ${tripPanel(emp, rec, r)}
   <section class="panel">
     <div class="ph"><h2>本月加項與扣項<small>系統算出的金額可直接改；空白表示用系統金額</small></h2>${r.overrides ? `<div class="acts"><button type="button" class="btn small" data-act="resetall">全部還原為系統金額</button></div>` : ''}</div>
     <div class="extras">
@@ -1142,6 +1234,8 @@ function dayTable(emp, rec, r) {
     const typeLbl = x.type === 'holiday' ? esc(x.hol) : P.TYPE_NAME[x.type];
     const otLbl = x.ot ? P.dur(x.ot) : '';
     const warns = [...x.warn]; if (x.excess) warns.unshift(`正常工時超過 8 小時的 ${x.excess} 分鐘已計入加班`);
+    if (d.trip) warns.push(`出差：${d.trip.from || '—'} → ${d.trip.to || '—'}，${d.trip.km || 0} 公里，過路費 ${d.trip.toll || 0} 元${d.trip.note ? '，' + d.trip.note : ''}`);
+    if (d.ls || d.b1s) warns.push(`當天${d.ls ? `午休 ${d.ls}–${d.le || ''}` : ''}${d.b1s ? `${d.ls ? '、' : ''}外出 ${d.b1s}–${d.b1e || ''}` : ''}`);
     return `<tr class="${off ? 'off' : ''}">
       <td class="dt">${md(x.d)}<i>${WK[dw]}</i></td>
       <td><span class="chip ${x.type}">${typeLbl}</span></td>
@@ -1343,6 +1437,7 @@ function viewSet() {
   <section class="panel"><div class="ph"><h2>公司設定</h2></div>
   <div class="form">${t('company', '公司名稱')}${t('manager', '主管（薪資單簽核）')}${t('accountant', '會計')}
     ${f('mealPerDay', '餐費（每出勤日）', '1')}
+    ${f('fuelKmPerL', '油資：每公升行駛公里數', '0.1', '打卡表沒寫時用這個')}${f('fuelPrice', '油資：每公升油價（元）', '0.1')}${f('maintPerKm', '私車保養補助：每公里（元）', '0.1')}
     <label class="chk"><input type="checkbox" ${S.mealInBase ? 'checked' : ''} data-f="set" data-k="mealInBase">餐費計入加班基數</label>
     <label>遲到扣款方式<select class="fi" data-f="set" data-k="lateMode"><option value="fixed" ${S.lateMode === 'fixed' ? 'selected' : ''}>每分鐘固定金額</option><option value="prop" ${S.lateMode === 'prop' ? 'selected' : ''}>依時薪比例</option></select></label>
     ${f('lateFreeMin', '每月遲到早退免扣分鐘數', '1', '當月合計在這個分鐘數以內：不扣薪、照發全勤')}
@@ -1538,6 +1633,54 @@ document.addEventListener('change', e => {
   save('months/' + el.dataset.key);
 });
 
+/* 出差與油資（在家版打卡表的出發地點、目的地、里程、過路費） */
+function tripPanel(emp, rec, r) {
+  const days = (rec && rec.days) || {};
+  const list = Object.keys(days).filter(d => d.startsWith(st.month) && days[d].trip).sort();
+  if (!list.length && !(rec && rec.format === 'home')) return '';
+  const c = r.trip.cfg, src = rec && rec.tripSrc;
+  const ti = (d, k, v, cls = '') => `<input class="fi ${cls}" type="text" value="${esc(v ?? '')}" data-f="trip" data-d="${d}" data-k="${k}">`;
+  const rows = list.map(d => { const t = days[d].trip; return `<tr><td class="dt">${md(d)}<i>${WK[P.dow(d)]}</i></td><td>${ti(d, 'from', t.from)}</td><td>${ti(d, 'to', t.to)}</td><td>${ti(d, 'km', t.km, 'num')}</td><td>${ti(d, 'toll', t.toll, 'num')}</td><td>${ti(d, 'note', t.note)}</td><td><button type="button" class="btn ghost small" data-act="tripdel" data-d="${d}" aria-label="刪除">✕</button></td></tr>`; }).join('');
+  const cf = (k, label, ph) => `<label>${label}<input class="fi num" type="text" inputmode="decimal" value="${esc(rec && rec.tripCfg && rec.tripCfg[k] != null ? rec.tripCfg[k] : '')}" placeholder="${esc(ph)}" data-f="tcfg" data-k="${k}"></label>`;
+  const chk = (a, b) => b == null ? '' : Math.abs(a - b) < 1 ? '<span class="okv">與打卡表一致</span>' : `<span class="badv">打卡表為 ${money(b)}</span>`;
+  return `<section class="panel"><div class="ph"><h2>出差與油資<small>${list.length} 天・${r.trip.km} 公里</small></h2></div>
+    <div class="tscroll"><table class="pt trip"><thead><tr><th>日期</th><th>出發地點</th><th>目的地</th><th>里程（公里）</th><th>過路費</th><th>出差備註</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="helper" style="margin-top:6px;border-top:0;padding-top:0"><input class="fi num" id="tripDate" type="text" placeholder="日期，例 10/6" style="width:110px"><button type="button" class="btn small" data-act="tripadd">＋新增出差日</button></div>
+    <div class="form" style="margin-top:12px">${cf('kmPerL', '每公升行駛公里數', `預設 ${st.settings.fuelKmPerL}`)}${cf('price', '每公升油價（元）', `預設 ${st.settings.fuelPrice}`)}${cf('maintPerKm', '私車保養補助每公里（元）', `預設 ${st.settings.maintPerKm}`)}</div>
+    <div class="tripsum">
+      <div><span>油資補助</span><b class="num">${money(r.trip.fuel)}</b><small>${r.trip.km} ÷ ${c.kmPerL} × ${c.price}</small>${chk(r.trip.fuel, src && src.fuel)}</div>
+      <div><span>過路費</span><b class="num">${money(r.trip.toll)}</b>${chk(r.trip.toll, src && src.toll)}</div>
+      <div><span>私車保養補助</span><b class="num">${money(r.trip.maint)}</b><small>${r.trip.km} × ${c.maintPerKm}</small>${chk(r.trip.maint, src && src.maint)}</div>
+      <div><span>里程合計</span><b class="num">${r.trip.km} 公里</b>${chk(r.trip.km, src && src.km)}</div>
+    </div>
+    <p class="hint" style="margin-top:8px">這三項會自動列入應支，金額可在下方「本月加項與扣項」再調整。</p></section>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act; const emp = st.emps[st.sel];
+  if (a === 'tripadd') {
+    const v = $('#tripDate').value.trim(); const m = /^(?:(\d{2,4})[\/\-.])?(\d{1,2})[\/\-.](\d{1,2})$/.exec(v);
+    if (!m) { toast('日期請填 10/6 或 2026/10/6'); return; }
+    const d = `${st.month.slice(0, 4)}-${String(+m[2]).padStart(2, '0')}-${String(+m[3]).padStart(2, '0')}`;
+    if (!d.startsWith(st.month)) { toast(`請填 ${+st.month.slice(5)} 月的日期`); return; }
+    const rec = ensureRec(emp.id, st.month); const day = rec.days[d] = rec.days[d] || {};
+    if (!day.trip) day.trip = { from: '', to: '', km: 0, toll: 0, note: '' }; day.field = true;
+    save(recPath(emp)); render();
+    const el = document.querySelector(`[data-f="trip"][data-d="${d}"][data-k="from"]`); if (el) el.focus();
+  } else if (a === 'tripdel') {
+    const rec = getRec(emp.id, st.month); const d = rec && rec.days[b.dataset.d]; if (!d) return;
+    delete d.trip; save(recPath(emp)); render();
+  } else if (a === 'applytyp') {
+    const rec = getRec(emp.id, st.month); const t = rec && rec.typical; if (!t) return;
+    const base = P.schedFor(emp, st.month + '-01', st.settings);
+    if (emp.schedMode !== 'custom') { emp.scheds = P.schedList(null, st.settings).map(x => ({ ...x })); emp.schedMode = 'custom'; }
+    const from = st.month + '-01';
+    const v = { from, start: t.in, ls: t.ls || base.ls, le: t.le || base.le, ...(t.b1s && t.b1e ? { b1s: t.b1s, b1e: t.b1e } : {}), end: t.out, ot: t.out };
+    emp.scheds = (emp.scheds || []).filter(x => x.from !== from); emp.scheds.push(v);
+    save('employees/' + emp.id); render(); toast(`已新增 ${from.replace(/-/g, '/')} 起的個人班表：${P.schedLabel(v)}`);
+  }
+});
+
 /* ---------- 事件 ---------- */
 const recPath = emp => 'months/' + recKey(emp.id, st.month);
 document.addEventListener('click', e => {
@@ -1661,6 +1804,16 @@ document.addEventListener('change', e => {
     const k = el.dataset.k; const S = st.settings;
     if (typeof val === 'boolean' || ['company', 'manager', 'accountant', 'lateMode', 'fieldWords', 'mealWords'].includes(k)) S[k] = val; else S[k] = parseFloat(val) || 0;
     save('config/main');
+  } else if (f === 'trip') {
+    const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); const d = rec.days[el.dataset.d] = rec.days[el.dataset.d] || {};
+    const tr = d.trip = d.trip || { from: '', to: '', km: 0, toll: 0, note: '' }; const k = el.dataset.k;
+    tr[k] = ['km', 'toll'].includes(k) ? (parseFloat(String(val).replace(/[,，]/g, '')) || 0) : String(val).trim();
+    d.field = true; if (k === 'note') { if (/外食/.test(tr.note)) delete d.meal; }
+    save(recPath(emp));
+  } else if (f === 'tcfg') {
+    const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); rec.tripCfg = rec.tripCfg || {};
+    const n = parseFloat(val); if (String(val).trim() === '' || isNaN(n)) delete rec.tripCfg[el.dataset.k]; else rec.tripCfg[el.dataset.k] = n;
+    save(recPath(emp));
   } else if (f === 'note') {
     const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month);
     const v = String(val).replace(/\s+$/, ''); if (v) rec.note = v; else delete rec.note;
@@ -1697,15 +1850,20 @@ async function importFiles(files) {
         if (parsed.salary) { emp.items[0].amount = parsed.salary; emp.items = emp.items.filter(i => i.kind !== 'attendance'); }
         const wage = parsed.salary || 30000; emp.labor = P.bracket(P.LABOR_TABLE, wage); emp.health = emp.pension = P.bracket(P.HEALTH_TABLE, wage);
         const co = P.schedFor(null, parsed.month + '-01', st.settings);
-        if (parsed.typicalIn && parsed.typicalOut && (parsed.typicalIn !== co.start || parsed.typicalOut !== co.end)) {
+        if (parsed.home && parsed.typical && parsed.typical.in && parsed.typical.out) {
+          const t = parsed.typical; emp.schedMode = 'custom'; emp.scheds = [{ from: '2000-01-01', start: t.in, ls: t.ls || co.ls, le: t.le || co.le, ...(t.b1s && t.b1e ? { b1s: t.b1s, b1e: t.b1e } : {}), end: t.out, ot: t.out }];
+        } else if (parsed.typicalIn && parsed.typicalOut && (parsed.typicalIn !== co.start || parsed.typicalOut !== co.end)) {
           emp.schedMode = 'custom'; emp.scheds = [{ ...co, from: '2000-01-01', start: parsed.typicalIn, end: parsed.typicalOut, ot: parsed.typicalOut }];
         } else emp.schedMode = 'company';
         st.emps[emp.id] = emp; save('employees/' + emp.id);
       }
       const rec = ensureRec(emp.id, parsed.month); rec.days = parsed.days;
+      rec.format = parsed.home ? 'home' : 'office';
+      if (parsed.home) { rec.tripCfg = Object.assign({}, rec.tripCfg || {}, Object.fromEntries(Object.entries(parsed.tripCfg || {}).filter(([, v]) => v != null))); rec.tripSrc = parsed.tripSrc || null; rec.typical = parsed.typical || null; }
+      else { delete rec.tripSrc; delete rec.typical; }
       save('months/' + recKey(emp.id, parsed.month));
       st.month = parsed.month; st.sel = emp.id;
-      done.push(`${emp.name} ${roc(parsed.month)}`);
+      done.push(`${emp.name} ${roc(parsed.month)}${parsed.home ? '（在家版）' : ''}`);
     } catch (err) { fail.push(`${file.name}：${err.message}`); }
   }
   st.tab = 'pay'; render();
