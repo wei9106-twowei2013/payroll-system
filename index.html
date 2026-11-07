@@ -282,6 +282,13 @@ table.pt.trip th:nth-child(1){width:60px}table.pt.trip th:nth-child(4),table.pt.
 .tripsum b{font-size:18px;font-weight:500;color:var(--accent)}
 .tripsum small{font-size:11.5px;color:var(--muted)}
 .okv{font-size:11.5px;color:var(--good)!important}.badv{font-size:11.5px;color:var(--bad)!important}
+.weekbox{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:14px}
+.wk-h{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+.wk-h label.chk{display:flex;align-items:center;gap:6px;font-size:13px}
+.wk-days{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.wkd{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:var(--r);padding:4px 10px;cursor:pointer;font-size:13.5px}
+.wkd.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.wkd input{margin:0}
 @media (prefers-reduced-motion:no-preference){.who,.btn{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -298,7 +305,7 @@ table.pt.trip th:nth-child(1){width:60px}table.pt.trip th:nth-child(4),table.pt.
 </section>
 <div class="wrap" id="appView" hidden>
   <header class="top">
-    <div class="brand"><h1>圖威薪資</h1><small>依勞動基準法計算・版本 2026-11-07c</small></div>
+    <div class="brand"><h1>圖威薪資</h1><small>依勞動基準法計算・版本 2026-11-07d</small></div>
     <div class="month" aria-label="薪資月份">
       <button type="button" data-act="mprev" aria-label="上個月">‹</button>
       <b id="mlabel" class="num">—</b>
@@ -491,7 +498,18 @@ const PAYCALC = (() => {
 
   const daysOfMonth = month => { const [y, m] = month.split('-').map(Number); const n = new Date(y, m, 0).getDate(); return Array.from({ length: n }, (_, i) => `${month}-${pad(i + 1)}`); };
   const dow = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd).getDay(); };
-  const dayType = (d, holMap) => holMap[d] ? 'holiday' : (dow(d) === 6 ? 'rest' : dow(d) === 0 ? 'regular' : 'work');
+  /* 每週工作日：預設週一至週五上班、週六休息日、週日例假；可依勞動契約另行約定（§36） */
+  const WEEK_DEFAULT = { work: [1, 2, 3, 4, 5], rest: 6, regular: 0 };
+  const weekOf = emp => { const w = emp && emp.week; if (!w || !Array.isArray(w.work)) return WEEK_DEFAULT; return { work: w.work.map(Number), rest: w.rest == null ? null : +w.rest, regular: w.regular == null ? null : +w.regular }; };
+  const dayType = (d, holMap, wk = WEEK_DEFAULT) => { if (holMap[d]) return 'holiday'; const w = dow(d); if (wk.work.includes(w)) return 'work'; return w === wk.regular ? 'regular' : 'rest'; };
+  const WK_NAME = '日一二三四五六';
+  function weekWarn(wk) {
+    const off = [0, 1, 2, 3, 4, 5, 6].filter(w => !wk.work.includes(w)), out = [];
+    if (wk.regular == null || !off.includes(wk.regular)) out.push('請指定例假日（§36 每 7 日應有 1 日例假）');
+    if (off.length < 2) out.push(`每週只休 ${off.length} 天，依 §36 每 7 日應有例假、休息日各 1 日`);
+    if (wk.work.length > 5) out.push(`每週工作 ${wk.work.length} 天，正常工時每週不得超過 40 小時（§30）`);
+    return out;
+  }
   const TYPE_NAME = { work: '工作日', rest: '休息日', regular: '例假日', holiday: '國定假日' };
   const tiers = (m, bands) => { let left = m, mult = 0; for (const [len, r] of bands) { const t = Math.min(left, len); mult += t * r; left -= t; if (left <= 0) break; } return mult / 60; };
   const floorU = (m, u) => Math.max(0, Math.floor(m / (u || 1)) * (u || 1));
@@ -512,13 +530,14 @@ const PAYCALC = (() => {
     const days = (rec && rec.days) || {};
     const ovr = (rec && rec.ovr) || {};
     const actual = !!(rec && rec.format === 'home');
+    const wk = weekOf(emp);
     const rows = []; const flags = [];
     let workdays = 0, mealDays = 0, lateMin = 0, unpaidH = 0, halfH = 0, attH = 0, sickH = 0, compMin = 0, capMin = 0, excessMin = 0;
     const otMin = { work: 0, rest: 0, regular: 0, holiday: 0 };
     const leaveList = {}; const usedScheds = new Map();
 
     for (const d of daysOfMonth(month)) {
-      const day = days[d] || {}; const type = dayType(d, holMap);
+      const day = days[d] || {}; const type = dayType(d, holMap, wk);
       const v = schedFor(emp, d, S); const si = schedInfo(v);
       const r = { d, type, hol: holMap[d] || '', day, ot: 0, excess: 0, late: 0, mult: 0, dayPay: false, warn: [], sched: v };
       const lv = day.leave && LEAVES[day.leave] ? day.leave : '';
@@ -668,6 +687,7 @@ const PAYCALC = (() => {
     addD('leave', '請假', Math.round(unpaidH * R) + Math.round(halfH * R * 0.5), leaveRemark);
     ((rec && rec.deducts) || []).forEach((x, idx) => deductions.push({ key: 'd' + idx, idx, label: x.label, amount: +x.amount || 0, remark: x.remark || '', extra: true }));
 
+    if (emp.week) weekWarn(wk).forEach(w => flags.push(`每週工作日設定：${w}`));
     if (capMin > (+S.otCap || 46) * 60) flags.push(`本月延長工時 ${dur(capMin)}，超過每月 ${S.otCap} 小時上限（§32）`);
     usedScheds.forEach(v => schedInfo(v).warn.forEach(w => flags.push(`班表 ${schedLabel(v)}：${w}`)));
     const noPunch = rows.filter(r => r.warn.includes('無打卡紀錄，請填假別')).map(r => `${+r.d.slice(5, 7)}/${+r.d.slice(8)}`);
@@ -687,7 +707,7 @@ const PAYCALC = (() => {
     if (!I.auto && I.health < sug.health) flags.push(`健保投保 ${I.health.toLocaleString()} 低於月薪對應級距 ${sug.health.toLocaleString()}`);
     const overrides = [...earnings, ...deductions].filter(x => x.overridden).length;
 
-    return { trip, ins: I, lateOver, attGone, lateFree, mealPer, rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
+    return { week: wk, trip, ins: I, lateOver, attGone, lateFree, mealPer, rows, R, dayWage, base, otPay, otAuto, otMin, compMin, capMin, excessMin, lateMin, mealDays, mealAmt, earnings, deductions, gross, ded, net: gross - ded, flags, employer, sug, workdays, scheds: [...usedScheds.values()], overrides };
   }
 
   /* 請假判斷：假別＋時數（支援「四小時」「半天」「1天」），照顧小孩視為家庭照顧假 */
@@ -792,7 +812,7 @@ const PAYCALC = (() => {
   }
   const at = (r, i) => i >= 0 ? r[i] : null;
 
-  return { parseLeave, insured, laborDue, normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
+  return { weekOf, weekWarn, WK_NAME, WEEK_DEFAULT, parseLeave, insured, laborDue, normSched, seniority, annualLeave, leaveDaysFor, DEFAULT_SETTINGS, LEAVES, TYPE_NAME, LABOR_TABLE, HEALTH_TABLE, bracket, newEmployee, migrateEmp, schedInfo, schedFor, schedList, schedLabel, computeMonth, parsePunchRows, daysOfMonth, dayType, dow, toMin, fmtMin, dur, hrs };
 })();
 if (typeof module !== 'undefined') module.exports = PAYCALC;
 
@@ -1177,7 +1197,7 @@ function viewPay() {
   const flagHtml = r.flags.length ? `<ul class="flags">${r.flags.map(f => `<li class="${/例假|逾 12|上限|§30|§35/.test(f) ? 'bad' : ''}">${esc(f)}</li>`).join('')}</ul>` : '';
   return `<div class="layout">${roster(emp.id)}<div style="min-width:0">
   <div class="emp-head">
-    <div><h2>${esc(emp.name)}</h2><div class="meta">${esc(emp.title || '未填職稱')}・${emp.schedMode === 'custom' ? '自訂班表' : '公司班表'} ${esc(schedTxt)}</div></div>
+    <div><h2>${esc(emp.name)}</h2><div class="meta">${esc(emp.title || '未填職稱')}・${emp.week ? `每週${r.week.work.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(w => P.WK_NAME[w]).join('')}上班（${r.week.rest != null ? `休息日週${P.WK_NAME[r.week.rest]}、` : ''}例假週${P.WK_NAME[r.week.regular]}）・` : ''}${emp.schedMode === 'custom' ? '自訂班表' : '公司班表'} ${esc(schedTxt)}</div></div>
     <div class="kpis">
       <div class="kpi"><span>加班費基數</span><b class="num">${money(r.base)}</b></div>
       <div class="kpi"><span>平日每小時工資</span><b class="num">${r.R.toFixed(2)}</b></div>
@@ -1319,6 +1339,22 @@ function viewSum() {
     ${R.map(x => `<tr><td><button type="button" class="btn ghost small" style="color:var(--ink);padding-left:0" data-act="open" data-id="${x.e.id}">${esc(x.e.name)}</button></td><td class="num">${x.items.length}</td><td class="num">${money(x.wage)}</td><td class="num">${money(x.reimb)}</td><td class="num net">${money(x.wage + x.reimb)}</td><td style="text-align:left;white-space:normal;min-width:220px">${esc(x.items.join('、'))}</td></tr>`).join('')}</tbody></table></div></section>`; })()}`;
 }
 
+/* 每週工作日（依勞動契約約定例假、休息日） */
+function weekEditor(emp) {
+  const wk = P.weekOf(emp), custom = !!emp.week;
+  const off = [0, 1, 2, 3, 4, 5, 6].filter(w => !wk.work.includes(w));
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const sel = (k, v) => `<select class="fi" data-f="week" data-k="${k}" aria-label="${k === 'regular' ? '例假日' : '休息日'}">${off.map(w => `<option value="${w}" ${v === w ? 'selected' : ''}>星期${P.WK_NAME[w]}</option>`).join('')}${k === 'rest' ? `<option value="" ${v == null ? 'selected' : ''}>無</option>` : ''}</select>`;
+  const warn = P.weekWarn(wk);
+  return `<div class="weekbox">
+    <div class="wk-h"><b>每週工作日</b><label class="chk"><input type="checkbox" ${custom ? 'checked' : ''} data-f="week" data-k="custom">依勞動契約另行約定（不是週一至週五）</label></div>
+    ${custom ? `<div class="wk-days">${order.map(w => `<label class="wkd ${wk.work.includes(w) ? 'on' : ''}"><input type="checkbox" ${wk.work.includes(w) ? 'checked' : ''} data-f="week" data-k="day" data-w="${w}">${P.WK_NAME[w]}</label>`).join('')}</div>
+      <div class="form" style="margin-top:10px"><label>例假日${sel('regular', wk.regular)}</label><label>休息日${sel('rest', wk.rest)}</label></div>
+      ${warn.length ? `<ul class="sv-warn">${warn.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      <p class="hint">工作日一律照平日計算，加班只看當天下班後；休息日出勤才用 1.34／1.67／2.67 倍，例假日出勤加發一日工資。國定假日仍依公司假日表。</p>`
+    : '<p class="hint">週一至週五上班，週六休息日、週日例假。</p>'}
+  </div>`;
+}
 /* 班表版本編輯器（公司與個人共用） */
 function schedEditor(list, scope) {
   const sorted = list.map((v, i) => ({ v, i })).sort((a, b) => a.v.from.localeCompare(b.v.from));
@@ -1376,6 +1412,7 @@ function viewEmp() {
         <label><input type="radio" name="smode" value="company" ${emp.schedMode !== 'custom' ? 'checked' : ''} data-f="emp" data-k="schedMode">依公司班表</label>
         <label><input type="radio" name="smode" value="custom" ${emp.schedMode === 'custom' ? 'checked' : ''} data-f="emp" data-k="schedMode">個人自訂班表</label>
       </div>
+      ${weekEditor(emp)}
       ${emp.schedMode === 'custom' ? schedEditor(emp.scheds, 'emp') : `<p class="hint">目前公司班表：${esc(P.schedLabel(P.schedFor(null, todayStr(), st.settings)))}。到「規則設定」可修改或新增生效日。</p>`}
     </section>
     <section class="panel"><div class="ph"><h2>每月固定薪資項目</h2><button type="button" class="btn small" data-act="additem">＋新增項目</button></div>
@@ -1806,6 +1843,19 @@ document.addEventListener('change', e => {
     const k = el.dataset.k; const S = st.settings;
     if (typeof val === 'boolean' || ['company', 'manager', 'accountant', 'lateMode', 'fieldWords', 'mealWords'].includes(k)) S[k] = val; else S[k] = parseFloat(val) || 0;
     save('config/main');
+  } else if (f === 'week') {
+    const emp = st.emps[st.sel]; const k = el.dataset.k;
+    if (k === 'custom') { if (val) emp.week = { work: [2, 3, 4, 5, 6], rest: 1, regular: 0 }; else delete emp.week; }
+    else {
+      const w = { ...P.weekOf(emp) }; w.work = [...w.work];
+      if (k === 'day') { const d = +el.dataset.w; if (val) { if (!w.work.includes(d)) w.work.push(d); } else w.work = w.work.filter(x => x !== d); w.work.sort(); }
+      else w[k] = val === '' ? null : +val;
+      const off = [0, 1, 2, 3, 4, 5, 6].filter(x => !w.work.includes(x));
+      if (!off.includes(w.regular)) w.regular = off.includes(0) ? 0 : (off[0] ?? null);
+      if (w.rest != null && (!off.includes(w.rest) || w.rest === w.regular)) w.rest = off.find(x => x !== w.regular) ?? null;
+      emp.week = w;
+    }
+    save('employees/' + emp.id);
   } else if (f === 'trip') {
     const emp = st.emps[st.sel]; const rec = ensureRec(emp.id, st.month); const d = rec.days[el.dataset.d] = rec.days[el.dataset.d] || {};
     const tr = d.trip = d.trip || { from: '', to: '', km: 0, toll: 0, note: '' }; const k = el.dataset.k;
