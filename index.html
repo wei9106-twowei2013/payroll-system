@@ -298,7 +298,7 @@ table.pt.trip th:nth-child(1){width:60px}table.pt.trip th:nth-child(4),table.pt.
 </section>
 <div class="wrap" id="appView" hidden>
   <header class="top">
-    <div class="brand"><h1>圖威薪資</h1><small>依勞動基準法計算・版本 2026-11-07b</small></div>
+    <div class="brand"><h1>圖威薪資</h1><small>依勞動基準法計算・版本 2026-11-07c</small></div>
     <div class="month" aria-label="薪資月份">
       <button type="button" data-act="mprev" aria-label="上個月">‹</button>
       <b id="mlabel" class="num">—</b>
@@ -376,7 +376,7 @@ const PAYCALC = (() => {
     pensionEr: 6, otCap: 46,
     fieldWords: '佈展,卸展,施工,監工,出差',
     mealWords: '佈展,卸展,施工',
-    quickEarn: ['全勤獎金', '專案獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '出差私車保養補助', '停車費'],
+    quickEarn: ['全勤獎金', '非經常性專案獎金', '中秋節禮金', '端午節禮金', '年終獎金', '代墊金額', '特休假換薪資', '出差油資費補助', '過路費', '出差私車保養補助', '停車費'],
     quickDed: ['預支', '代扣款', '其他'],
     holidays: [
       ['2026-01-01', '開國紀念日'], ['2026-02-16', '除夕'], ['2026-02-17', '春節'], ['2026-02-18', '春節'],
@@ -1058,7 +1058,7 @@ function enterApp(user) {
     if (st.ready && changed) render(); done();
   }, handleErr));
   unsubs.push(onSnapshot(doc(fdb, COLL.config, 'main'), s => {
-    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (Array.isArray(v.quickEarn)) v.quickEarn = v.quickEarn.map(x => x === '工作獎金' ? '專案獎金' : x); if (Array.isArray(v.quickEarn) && !v.quickEarn.includes('出差私車保養補助') && !v.addedCarMaint) { const i = v.quickEarn.indexOf('過路費'); v.quickEarn.splice(i >= 0 ? i + 1 : v.quickEarn.length, 0, '出差私車保養補助'); v.addedCarMaint = true; } if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
+    if (!dirty.has('config/main') && s.exists()) { const v = Object.assign(clone(P.DEFAULT_SETTINGS), s.data()); if (Array.isArray(v.quickEarn)) v.quickEarn = v.quickEarn.map(x => x === '工作獎金' || x === '專案獎金' ? '非經常性專案獎金' : x).filter((x, i, a) => a.indexOf(x) === i); if (Array.isArray(v.quickEarn) && !v.quickEarn.includes('出差私車保養補助') && !v.addedCarMaint) { const i = v.quickEarn.indexOf('過路費'); v.quickEarn.splice(i >= 0 ? i + 1 : v.quickEarn.length, 0, '出差私車保養補助'); v.addedCarMaint = true; } if (JSON.stringify(v.schedules) === '[{"from":"2000-01-01","start":"08:00","ls":"12:00","le":"13:30","end":"17:30","ot":"17:30"},{"from":"2026-10-01","start":"08:00","ls":"12:00","le":"13:00","end":"17:30","ot":"17:30"}]') v.schedules = clone(P.DEFAULT_SETTINGS.schedules); if (JSON.stringify(v) !== JSON.stringify(st.settings)) { st.settings = v; if (st.ready) render(); } }
     done();
   }, handleErr));
   resetIdle();
