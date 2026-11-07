@@ -298,7 +298,7 @@ table.pt.trip th:nth-child(1){width:60px}table.pt.trip th:nth-child(4),table.pt.
 </section>
 <div class="wrap" id="appView" hidden>
   <header class="top">
-    <div class="brand"><h1>圖威薪資</h1><small>依勞動基準法計算</small></div>
+    <div class="brand"><h1>圖威薪資</h1><small>依勞動基準法計算・版本 2026-11-07b</small></div>
     <div class="month" aria-label="薪資月份">
       <button type="button" data-act="mprev" aria-label="上個月">‹</button>
       <b id="mlabel" class="num">—</b>
@@ -670,7 +670,9 @@ const PAYCALC = (() => {
 
     if (capMin > (+S.otCap || 46) * 60) flags.push(`本月延長工時 ${dur(capMin)}，超過每月 ${S.otCap} 小時上限（§32）`);
     usedScheds.forEach(v => schedInfo(v).warn.forEach(w => flags.push(`班表 ${schedLabel(v)}：${w}`)));
-    rows.forEach(r => r.warn.forEach(w => flags.push(`${+r.d.slice(5, 7)}/${+r.d.slice(8)} ${w}`)));
+    const noPunch = rows.filter(r => r.warn.includes('無打卡紀錄，請填假別')).map(r => `${+r.d.slice(5, 7)}/${+r.d.slice(8)}`);
+    if (noPunch.length) flags.push(`${noPunch.length} 個工作日沒有打卡紀錄，請補上時間或假別：${noPunch.join('、')}`);
+    rows.forEach(r => r.warn.forEach(w => { if (w !== '無打卡紀錄，請填假別') flags.push(`${+r.d.slice(5, 7)}/${+r.d.slice(8)} ${w}`); }));
 
     const gross = earnings.reduce((a, x) => a + x.amount, 0);
     const ded = deductions.reduce((a, x) => a + x.amount, 0);
